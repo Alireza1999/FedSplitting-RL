@@ -1,1 +1,2 @@
 # FedSplitting-RL
+The aim of this project is to design a reinforcement learning agent that can divide the neural network between IoT devices, edge servers and cloud in order to improve energy consumption in IoT devices that are in a federated learning process.
