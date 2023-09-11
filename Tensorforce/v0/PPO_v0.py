@@ -33,12 +33,12 @@ agent = Agent.create(
     use_beta_distribution=True,
     # Optimization
     batch_size=10, update_frequency=2, learning_rate=1e-5, subsampling_fraction=0.2,
-    optimization_steps=5,
+    optimization_steps=2,
     # Reward estimation
     likelihood_ratio_clipping=0.2, discount=0.96, estimate_terminal=False,
     # Critic
     critic_network='auto',
-    critic_optimizer=dict(optimizer='adam', multi_step=10, learning_rate=1e-5),
+    critic_optimizer=dict(optimizer='adam', multi_step=2, learning_rate=1e-5),
     # Preprocessing
     preprocessing=None,
     # Exploration
@@ -56,7 +56,7 @@ AvgEnergyOfIotDevices = list()
 x = list()
 
 # Train for 100 episodes
-for i in range(2001):
+for i in range(250):
     episode_states = list()
     episode_internals = list()
     episode_actions = list()
@@ -84,7 +84,7 @@ for i in range(2001):
     energyConsumption.append(sum(episode_energy) / 200)
 
     x.append(i)
-    if i % 500 == 0:
+    if i % 25 == 0:
         utils.draw_graph(title="Reward vs Episode",
                          xlabel="Episode",
                          ylabel="Reward",

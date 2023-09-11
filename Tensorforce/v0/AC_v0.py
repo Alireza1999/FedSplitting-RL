@@ -31,13 +31,13 @@ agent = Agent.create(
     # Automatically configured network
     network='auto',
     # Optimization
-    batch_size=10, update_frequency=2, learning_rate=0.00001,
+    batch_size=10, update_frequency=2, learning_rate=0.0001,
     # Reward estimation
     discount=0.99, estimate_terminal=False,
     # Critic
     horizon=1,
     critic_network='auto',
-    critic_optimizer=dict(optimizer='adam', multi_step=10, learning_rate=0.00001),
+    critic_optimizer=dict(optimizer='adam', multi_step=10, learning_rate=0.0001),
     # Preprocessing
     preprocessing=None,
     # Exploration
@@ -81,7 +81,7 @@ for i in range(2001):
         episode_terminal.append(terminal)
         episode_reward.append(reward)
         episode_energy.append(sum(states[:len(iotDevices)]) / len(iotDevices))
-        AvgEnergyOfIotDevices.append(sum(states[:len(iotDevices)])/len(iotDevices))
+        AvgEnergyOfIotDevices.append(sum(states[:len(iotDevices)]) / len(iotDevices))
 
     sumRewardOfEpisodes.append(sum(episode_reward) / 200)
     energyConsumption.append(sum(episode_energy) / 200)
@@ -95,7 +95,7 @@ for i in range(2001):
                          figSizeY=5,
                          x=x,
                          y=sumRewardOfEpisodes,
-                         savePath="Graphs/AC_v0",
+                         savePath="Graphs/AC",
                          pictureName=f"AC_Reward_episode{i}")
 
         utils.draw_graph(title="Avg Energy vs Episode",
@@ -105,7 +105,7 @@ for i in range(2001):
                          figSizeY=5,
                          x=x,
                          y=energyConsumption,
-                         savePath="Graphs/AC_v0",
+                         savePath="Graphs/AC",
                          pictureName=f"AC_Energy_episode{i}")
 
     agent.experience(
