@@ -66,7 +66,7 @@ agent = Agent.create(
     recorder=None,
 
     config=dict(name='agent',
-                device="GPU",
+                device="CPU",
                 parallel_interactions=1,
                 seed=None,
                 execution=None,
@@ -176,13 +176,12 @@ agent = Agent.create(
 #         plt.title("Energy vs Episodes")
 #         plt.show()
 
+# Close agent and environment
 # Initialize the runner
 runner = Runner(agent=agent, environment=environment, max_episode_timesteps=100)
 
 # Train for 200 episodes
 runner.run(num_episodes=500)
 runner.close()
-
-# Close agent and environment
 # agent.close()
 # environment.close()

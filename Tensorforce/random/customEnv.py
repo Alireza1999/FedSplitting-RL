@@ -19,27 +19,6 @@ class CustomEnvironment(Environment):
         self.iotDevices: list[Device] = iotDevices
         self.edgeDevices: list[Device] = edgeDevices
         self.cloud: Device = cloud
-        self.trainingTimeArray: list = []
-
-    def states(self):
-        # return dict(type="float", shape=(self.iotDeviceNum * 3,))
-        return dict(type="float", shape=(self.iotDeviceNum * 3 + self.edgeDeviceNum,))
-
-    def actions(self):
-        return dict(type="float", shape=(self.iotDeviceNum * 2,), min_value=0.0, max_value=1.0)
-
-    def max_episode_timesteps(self):
-        return super().max_episode_timesteps()
-
-    def close(self):
-        super().close()
-
-    def reset(self):
-        randEnergy = np.random.uniform(low=0.0, high=50.0, size=(self.iotDeviceNum,))
-        randActions = np.random.uniform(low=0.0, high=1.0, size=(self.iotDeviceNum * 2))
-        edgeCapacity = [np.random.randint(0, edges.capacity) for edges in self.edgeDevices]
-        temp = np.append(randEnergy, edgeCapacity)
-        return np.append(temp, randActions)
 
     def rewardFun(self, actions):
         reward = 0
@@ -76,7 +55,6 @@ class CustomEnvironment(Environment):
 
         # add a float number to reward using tanh activation function
         reward += (utils.tanhActivation(maxTrainingTime / 5) * (-1)) + 1
-        self.trainingTimeArray.append(maxTrainingTime)
 
         for i in range(self.edgeDeviceNum):
             if edgeCapacity[i] < 0:
@@ -93,12 +71,4 @@ class CustomEnvironment(Environment):
 
         temp = np.append(iotEnergyList, edgeCapacity)
         newState = np.append(temp, actions)
-        return reward, newState
-
-    def execute(self, actions: list):
-        terminal = False
-        reward, newState = self.rewardFun(actions)
-        return newState, terminal, reward
-
-    def getTrainingTimeArray(self):
-        return self.trainingTimeArray
+        return reward, newState, maxTrainingTime

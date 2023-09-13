@@ -37,6 +37,19 @@ def draw_graph(figSizeX, figSizeY, x, y, title, xlabel, ylabel, savePath, pictur
         if not os.path.exists(savePath):
             os.makedirs(savePath)  # Create the directory if it does not exist
         plt.savefig(os.path.join(savePath, pictureName))  # Save the plot as PNG image
+    # Show the plot
+    plt.show()
+
+
+def draw_hist(x, title, xlabel, savePath, pictureName, saveFig=True):
+    # Create a plot
+    plt.hist(x, 10)
+    plt.title(title)  # Add a title
+    plt.xlabel(xlabel)  # Add x-axis label
+    if saveFig:
+        if not os.path.exists(savePath):
+            os.makedirs(savePath)  # Create the directory if it does not exist
+        plt.savefig(os.path.join(savePath, pictureName))  # Save the plot as PNG image
 
     # Show the plot
     plt.show()

@@ -1,10 +1,11 @@
 from tensorforce import Agent, Environment
-from Tensorforce.v1.customEnv import CustomEnvironment
 from Tensorforce import utils
-from matplotlib import pyplot as plt
+from Tensorforce import config
+from Tensorforce.v0.customEnv_v0 import CustomEnvironment
 import logging
+from matplotlib import pyplot as plt
 
-logging.basicConfig(filename="./Logs/AC/info.log",
+logging.basicConfig(filename="./Logs/info.log",
                     format='%(message)s',
                     filemode='w')
 logger = logging.getLogger()
@@ -14,41 +15,48 @@ iotDevices = utils.createDeviceFromCSV(csvFilePath="../../System/iotDevices.csv"
 edgeDevices = utils.createDeviceFromCSV(csvFilePath="../../System/edges.csv", deviceType='edge')
 cloud = utils.createDeviceFromCSV(csvFilePath="../../System/cloud.csv")[0]
 
+avgEnergyWithoutSplitting = 0
+for device in iotDevices:
+    avgEnergyWithoutSplitting += device.energyConsumption([config.LAYER_NUM - 1, config.LAYER_NUM - 1])
+avgEnergyWithoutSplitting /= len(iotDevices)
+
 environment = Environment.create(
-    environment=CustomEnvironment(iotDevices=iotDevices, edgeDevices=edgeDevices, cloud=cloud),
+    environment=CustomEnvironment(iotDevices=iotDevices, edgeDevices=edgeDevices, cloud=cloud,
+                                  energyWithoutSplitting=avgEnergyWithoutSplitting),
     max_episode_timesteps=200
 )
 
 agent = Agent.create(
-    agent='ac', environment=environment,
+    agent='ppo', environment=environment,
     # Automatically configured network
     network='auto',
+    use_beta_distribution=True,
     # Optimization
-    batch_size=10, update_frequency=2, learning_rate=0.0001,
+    batch_size=10, update_frequency=2, learning_rate=1e-5, subsampling_fraction=0.2,
+    optimization_steps=2,
     # Reward estimation
-    discount=0.99, estimate_terminal=False,
+    likelihood_ratio_clipping=0.2, discount=0.96, estimate_terminal=False,
     # Critic
-    horizon=1,
     critic_network='auto',
-    critic_optimizer=dict(optimizer='adam', multi_step=10, learning_rate=0.0001),
+    critic_optimizer=dict(optimizer='adam', multi_step=2, learning_rate=1e-5),
     # Preprocessing
     preprocessing=None,
     # Exploration
     exploration=0.1, variable_noise=0.0,
     # Regularization
-    l2_regularization=0.1, entropy_regularization=0.01,
+    l2_regularization=0.0, entropy_regularization=0.2,
     # TensorFlow etc
     name='agent', device=None, parallel_interactions=1, seed=None, execution=None, saver=None,
     summarizer=None, recorder=None
 )
-
 sumRewardOfEpisodes = list()
 energyConsumption = list()
 AvgEnergyOfIotDevices = list()
+
 x = list()
 
 # Train for 100 episodes
-for i in range(2001):
+for i in range(250):
     episode_states = list()
     episode_internals = list()
     episode_actions = list()
@@ -74,8 +82,9 @@ for i in range(2001):
 
     sumRewardOfEpisodes.append(sum(episode_reward) / 200)
     energyConsumption.append(sum(episode_energy) / 200)
+
     x.append(i)
-    if i % 500 == 0:
+    if i % 25 == 0:
         utils.draw_graph(title="Reward vs Episode",
                          xlabel="Episode",
                          ylabel="Reward",
@@ -83,26 +92,18 @@ for i in range(2001):
                          figSizeY=5,
                          x=x,
                          y=sumRewardOfEpisodes,
-                         savePath="Graphs/AC",
-                         pictureName=f"AC_Reward_episode{i}")
+                         savePath="Graphs/PPO_v0",
+                         pictureName=f"PPO_Reward_episode{i}")
 
-        utils.draw_graph(title="Energy vs Episode",
+        utils.draw_graph(title="Avg Energy vs Episode",
                          xlabel="Episode",
                          ylabel="Average Energy",
                          figSizeX=15,
                          figSizeY=5,
                          x=x,
                          y=energyConsumption,
-                         savePath="Graphs/AC",
-                         pictureName=f"AC_Energy_episode{i}")
-
-        utils.draw_hist(title="Training Time",
-                        xlabel="training Time",
-                        figSizeX=15,
-                        figSizeY=5,
-                        x=environment.getTrainingTimeArray(),
-                        savePath="Graphs/AC",
-                        pictureName=f"AC_trainingTime_hist")
+                         savePath="Graphs/PPO_v0",
+                         pictureName=f"PPO_Energy_episode{i}")
 
     agent.experience(
         states=episode_states, internals=internals,
@@ -111,14 +112,8 @@ for i in range(2001):
     )
     agent.update()
 
-utils.draw_hist(title="Avg energy of IOT device",
-                xlabel="Avg Energy Time",
-                figSizeX=15,
-                figSizeY=5,
-                x=AvgEnergyOfIotDevices,
-                savePath="Graphs/AC",
-                pictureName=f"AC_avgEnergy_hist")
-
+plt.hist(AvgEnergyOfIotDevices, 10)
+plt.show()
 # Evaluate for 100 episodes
 # sum_rewards = 0.0
 # for i in range(1000):
@@ -152,6 +147,7 @@ utils.draw_hist(title="Avg energy of IOT device",
 #         plt.plot(energyConsumption)
 #         plt.title("Energy vs Episodes")
 #         plt.show()
+print(agent.get_available_summaries())
 
 # Close agent and environment
 agent.close()

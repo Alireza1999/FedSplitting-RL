@@ -9,7 +9,8 @@ logger = logging.getLogger()
 
 class CustomEnvironment(Environment):
 
-    def __init__(self, iotDevices: list[Device], edgeDevices: list[Device], cloud: Device):
+    def __init__(self, iotDevices: list[Device], edgeDevices: list[Device], cloud: Device,
+                 energyWithoutSplitting: float):
 
         super().__init__()
 
@@ -19,9 +20,13 @@ class CustomEnvironment(Environment):
         self.iotDevices: list[Device] = iotDevices
         self.edgeDevices: list[Device] = edgeDevices
         self.cloud: Device = cloud
-        self.trainingTimeArray: list = []
+
+        self.avgEnergyWithoutSplitting = energyWithoutSplitting
 
     def states(self):
+        """Returns the state space specification. energy of each iot device, capacity of each edge device,
+        and actions previously taken by agent."""
+
         # return dict(type="float", shape=(self.iotDeviceNum * 3,))
         return dict(type="float", shape=(self.iotDeviceNum * 3 + self.edgeDeviceNum,))
 
@@ -67,29 +72,32 @@ class CustomEnvironment(Environment):
             if totalTrainingTime > maxTrainingTime:
                 maxTrainingTime = totalTrainingTime
 
-            # computing energy consumption of iot devices
+            # calculating energy consumption of iot devices
             iotEnergy = self.iotDevices[int(i / 2)].energyConsumption([op1, op2])
             totalEnergyConsumption += iotEnergy
 
             # add this iot device energy consumption for new state
             iotEnergyList.append(iotEnergy)
 
+        averageEnergyConsumption = totalEnergyConsumption / self.iotDeviceNum
         # add a float number to reward using tanh activation function
-        reward += (utils.tanhActivation(maxTrainingTime / 5) * (-1)) + 1
-        self.trainingTimeArray.append(maxTrainingTime)
+        if averageEnergyConsumption > self.avgEnergyWithoutSplitting:
+            reward += (self.avgEnergyWithoutSplitting / averageEnergyConsumption) - 1
+        else:
+            reward += 2 - (averageEnergyConsumption / self.avgEnergyWithoutSplitting)
 
         for i in range(self.edgeDeviceNum):
             if edgeCapacity[i] < 0:
-                reward += edgeCapacity[i] / 5
+                reward += edgeCapacity[i] / self.edgeDevices[i].capacity
 
-        averageEnergyConsumption = totalEnergyConsumption / self.iotDeviceNum
-        # add a float number to reward using tanh activation function
-        reward += (utils.tanhActivation(averageEnergyConsumption / 15) * (-1)) + 1
+        reward += utils.tanhActivation(maxTrainingTime)
 
-        logger.info("Energy :\n {} \n".format(iotEnergyList[:self.iotDeviceNum + 1]))
-        logger.info("Reward of this action :\n {} \n".format(reward))
-        logger.info("Offloading layer :\n {} \n".format(offloadingPointsList))
-        logger.info("Edges Capacities :\n {} \n".format(edgeCapacity))
+        logger.info("Offloading layer :\n{} \n".format(offloadingPointsList))
+        logger.info("Edges Capacities :\n{} \n".format(edgeCapacity))
+        logger.info("Total TrainingTime :\n{} \n".format(maxTrainingTime))
+        logger.info("Avg Energy consumption :\n{} \n".format(averageEnergyConsumption))
+        logger.info("==================================================================")
+
 
         temp = np.append(iotEnergyList, edgeCapacity)
         newState = np.append(temp, actions)
@@ -99,6 +107,3 @@ class CustomEnvironment(Environment):
         terminal = False
         reward, newState = self.rewardFun(actions)
         return newState, terminal, reward
-
-    def getTrainingTimeArray(self):
-        return self.trainingTimeArray

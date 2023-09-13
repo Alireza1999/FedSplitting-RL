@@ -6,7 +6,7 @@ import logging
 from matplotlib import pyplot as plt
 from tensorforce import Runner
 
-logging.basicConfig(filename="./Logs/TF_agent/info.log",
+logging.basicConfig(filename="./Logs/AC/info.log",
                     format='%(message)s',
                     filemode='w')
 logger = logging.getLogger()
@@ -21,65 +21,43 @@ for device in iotDevices:
     avgEnergyWithoutSplitting += device.energyConsumption([config.LAYER_NUM - 1, config.LAYER_NUM - 1])
 avgEnergyWithoutSplitting /= len(iotDevices)
 print(avgEnergyWithoutSplitting)
+
 environment = Environment.create(
     environment=CustomEnvironment(iotDevices=iotDevices,
-                                  edgeDevices=edgeDevices, cloud=cloud,
-                                  energyWithoutSplitting=avgEnergyWithoutSplitting),
-)
+                                  edgeDevices=edgeDevices,
+                                  cloud=cloud,
+                                  energyWithoutSplitting=avgEnergyWithoutSplitting))
 
 agent = Agent.create(
-    agent='tensorforce', environment=environment,
-    max_episode_timesteps=100,
+    agent='ac', environment=environment,
+    # Automatically configured network
+    network='auto',
+    # Optimization
+    batch_size=10, update_frequency=2, learning_rate=0.0001,
     # Reward estimation
-    reward_estimation=dict(
-        horizon=1,
-        discount=0.99),
-
-    # Optimizer
-    optimizer=dict(
-        optimizer='adam', learning_rate=0.001, clipping_threshold=0.01,
-        multi_step=10, subsampling_fraction=0.99
-    ),
-
-    # update network every 5 timestep
-    update=dict(
-        unit='timesteps',
-        batch_size=5,
-    ),
-
-    objective='policy_gradient',
+    discount=0.99, estimate_terminal=False,
+    # Critic
+    horizon=1,
+    critic_network='auto',
+    critic_optimizer=dict(optimizer='adam', multi_step=10, learning_rate=0.0001),
     # Preprocessing
     preprocessing=None,
-
     # Exploration
     exploration=0.1, variable_noise=0.0,
-
     # Regularization
     l2_regularization=0.1, entropy_regularization=0.01,
-    memory=100,
     # TensorFlow etc
-    # saver=dict(directory='model', filename='model'),
-    summarizer=dict(directory="summaries/",
-                    frequency=50,
-                    labels='all'
-                    ),
-    recorder=None,
-
-    config=dict(name='agent',
-                device="GPU",
-                parallel_interactions=1,
-                seed=None,
-                execution=None,
-                )
+    name='agent', device=None, parallel_interactions=1, seed=None, execution=None, saver=None,
+    summarizer=None, recorder=None
 )
 
-# sumRewardOfEpisodes = list()
-# energyConsumption = list()
-# x = list()
-# AvgEnergyOfIotDevices = list()
+sumRewardOfEpisodes = list()
+energyConsumption = list()
+x = list()
+AvgEnergyOfIotDevices = list()
 
 # Train for 100 episodes
-# for i in range(50):
+# for i in range(2001):
 #     episode_states = list()
 #     episode_internals = list()
 #     episode_actions = list()
@@ -119,8 +97,8 @@ agent = Agent.create(
 #                          figSizeY=5,
 #                          x=x,
 #                          y=sumRewardOfEpisodes,
-#                          savePath="Graphs/TF_agent",
-#                          pictureName=f"TF_Reward_episode{i}")
+#                          savePath="Graphs/AC",
+#                          pictureName=f"AC_Reward_episode{i}")
 #
 #         utils.draw_graph(title="Avg Energy vs Episode",
 #                          xlabel="Episode",
@@ -129,8 +107,8 @@ agent = Agent.create(
 #                          figSizeY=5,
 #                          x=x,
 #                          y=energyConsumption,
-#                          savePath="Graphs/TF_agent",
-#                          pictureName=f"TF_Energy_episode{i}")
+#                          savePath="Graphs/AC",
+#                          pictureName=f"AC_Energy_episode{i}")
 #
 #     agent.experience(
 #         states=episode_states, internals=internals,
@@ -139,8 +117,8 @@ agent = Agent.create(
 #     )
 #     agent.update()
 
-# plt.hist(AvgEnergyOfIotDevices, 10)
-# plt.show()
+plt.hist(AvgEnergyOfIotDevices, 10)
+plt.show()
 
 # Evaluate for 100 episodes
 # sum_rewards = 0.0
@@ -176,6 +154,8 @@ agent = Agent.create(
 #         plt.title("Energy vs Episodes")
 #         plt.show()
 
+# Close agent and environment
+
 # Initialize the runner
 runner = Runner(agent=agent, environment=environment, max_episode_timesteps=100)
 
@@ -183,6 +163,5 @@ runner = Runner(agent=agent, environment=environment, max_episode_timesteps=100)
 runner.run(num_episodes=500)
 runner.close()
 
-# Close agent and environment
 # agent.close()
 # environment.close()
