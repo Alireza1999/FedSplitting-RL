@@ -19,7 +19,7 @@ avgEnergyWithoutSplitting = 0
 for device in iotDevices:
     avgEnergyWithoutSplitting += device.energyConsumption([config.LAYER_NUM - 1, config.LAYER_NUM - 1])
 avgEnergyWithoutSplitting /= len(iotDevices)
-
+print(avgEnergyWithoutSplitting)
 environment = Environment.create(
     environment=CustomEnvironment(iotDevices=iotDevices, edgeDevices=edgeDevices, cloud=cloud,
                                   energyWithoutSplitting=avgEnergyWithoutSplitting),
@@ -56,7 +56,7 @@ AvgEnergyOfIotDevices = list()
 x = list()
 
 # Train for 100 episodes
-for i in range(250):
+for i in range(2001):
     episode_states = list()
     episode_internals = list()
     episode_actions = list()
@@ -84,7 +84,7 @@ for i in range(250):
     energyConsumption.append(sum(episode_energy) / 200)
 
     x.append(i)
-    if i % 25 == 0:
+    if i % 500 == 0:
         utils.draw_graph(title="Reward vs Episode",
                          xlabel="Episode",
                          ylabel="Reward",

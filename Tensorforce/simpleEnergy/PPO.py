@@ -1,62 +1,83 @@
 from tensorforce import Agent, Environment
 from Tensorforce import utils
 from Tensorforce import config
-from Tensorforce.v0.customEnv_v0 import CustomEnvironment
+from Tensorforce.simpleEnergy.customEnv import CustomEnvironment
 import logging
 from matplotlib import pyplot as plt
+import numpy as np
 
-logging.basicConfig(filename="./Logs/info.log",
+logging.basicConfig(filename="./Logs/PPO/info.log",
                     format='%(message)s',
                     filemode='w')
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
-iotDevices = utils.createDeviceFromCSV(csvFilePath="../../System/iotDevices.csv", deviceType='iotDevice')
-edgeDevices = utils.createDeviceFromCSV(csvFilePath="../../System/edges.csv", deviceType='edge')
+iotDevices = utils.createDeviceFromCSV(csvFilePath="../../System/iotDevicesSmallScale.csv", deviceType='iotDevice')
+edgeDevices = utils.createDeviceFromCSV(csvFilePath="../../System/edgesSmallScale.csv", deviceType='edge')
 cloud = utils.createDeviceFromCSV(csvFilePath="../../System/cloud.csv")[0]
 
-avgEnergyWithoutSplitting = 0
-for device in iotDevices:
-    avgEnergyWithoutSplitting += device.energyConsumption([config.LAYER_NUM - 1, config.LAYER_NUM - 1])
-avgEnergyWithoutSplitting /= len(iotDevices)
-
 environment = Environment.create(
-    environment=CustomEnvironment(iotDevices=iotDevices, edgeDevices=edgeDevices, cloud=cloud,
-                                  energyWithoutSplitting=avgEnergyWithoutSplitting),
+    environment=CustomEnvironment(iotDevices=iotDevices,
+                                  edgeDevices=edgeDevices,
+                                  cloud=cloud),
     max_episode_timesteps=200
 )
 
 agent = Agent.create(
+    # Agent and Env
     agent='ppo', environment=environment,
+
     # Automatically configured network
     network='auto',
     use_beta_distribution=True,
+
     # Optimization
-    batch_size=10, update_frequency=2, learning_rate=1e-5, subsampling_fraction=0.2,
+
+    # Number of episodes per update batch
+    batch_size=1,
+    # Frequency of updates (default: batch_size).
+    update_frequency=2,
+    # Optimizer learning rate
+    learning_rate=3.0e-3,
+    # Fraction of batch timesteps to subsample (default: 0.33).
+    subsampling_fraction=0.99,
+    # Number of optimization steps
     optimization_steps=2,
+
     # Reward estimation
     likelihood_ratio_clipping=0.2, discount=0.96, estimate_terminal=False,
+
     # Critic
     critic_network='auto',
-    critic_optimizer=dict(optimizer='adam', multi_step=2, learning_rate=1e-5),
+    critic_optimizer=dict(optimizer='adam', multi_step=2, learning_rate=1.0e-3),
+
     # Preprocessing
     preprocessing=None,
+
     # Exploration
     exploration=0.1, variable_noise=0.0,
+
     # Regularization
-    l2_regularization=0.0, entropy_regularization=0.2,
+    l2_regularization=0.1, entropy_regularization=0.2,
+
     # TensorFlow etc
-    name='agent', device=None, parallel_interactions=1, seed=None, execution=None, saver=None,
-    summarizer=None, recorder=None
+    name='agent',
+    device=None,
+    parallel_interactions=1,
+    seed=None,
+    execution=None,
+    saver=None,
+    summarizer=dict(directory="summaries/PPO/",
+                    labels='all'),
+    recorder=None
 )
 sumRewardOfEpisodes = list()
 energyConsumption = list()
-AvgEnergyOfIotDevices = list()
 
 x = list()
-
+j = 0
 # Train for 100 episodes
-for i in range(250):
+for i in range(2501):
     episode_states = list()
     episode_internals = list()
     episode_actions = list()
@@ -68,6 +89,7 @@ for i in range(250):
     internals = agent.initial_internals()
     terminal = False
     while not terminal:
+        j += 1
         episode_states.append(states)
         episode_internals.append(internals)
         actions, internals = agent.act(
@@ -77,14 +99,14 @@ for i in range(250):
         states, terminal, reward = environment.execute(actions=actions)
         episode_terminal.append(terminal)
         episode_reward.append(reward)
-        episode_energy.append(sum(states[:len(iotDevices)]) / len(iotDevices))
-        AvgEnergyOfIotDevices.append(sum(states[:len(iotDevices)]) / len(iotDevices))
+        episode_energy.append(states[0])
+        x.append(j)
 
-    sumRewardOfEpisodes.append(sum(episode_reward) / 200)
-    energyConsumption.append(sum(episode_energy) / 200)
+    sumRewardOfEpisodes = np.append(sumRewardOfEpisodes, episode_reward)
+    energyConsumption = np.append(energyConsumption, episode_energy)
 
-    x.append(i)
-    if i % 25 == 0:
+    # x.append(j)
+    if i % 500 == 0:
         utils.draw_graph(title="Reward vs Episode",
                          xlabel="Episode",
                          ylabel="Reward",
@@ -92,7 +114,7 @@ for i in range(250):
                          figSizeY=5,
                          x=x,
                          y=sumRewardOfEpisodes,
-                         savePath="Graphs/PPO_v0",
+                         savePath="Graphs/PPO",
                          pictureName=f"PPO_Reward_episode{i}")
 
         utils.draw_graph(title="Avg Energy vs Episode",
@@ -102,7 +124,7 @@ for i in range(250):
                          figSizeY=5,
                          x=x,
                          y=energyConsumption,
-                         savePath="Graphs/PPO_v0",
+                         savePath="Graphs/PPO",
                          pictureName=f"PPO_Energy_episode{i}")
 
     agent.experience(
@@ -112,8 +134,9 @@ for i in range(250):
     )
     agent.update()
 
-plt.hist(AvgEnergyOfIotDevices, 10)
+plt.hist(energyConsumption, 10)
 plt.show()
+
 # Evaluate for 100 episodes
 # sum_rewards = 0.0
 # for i in range(1000):
@@ -147,7 +170,6 @@ plt.show()
 #         plt.plot(energyConsumption)
 #         plt.title("Energy vs Episodes")
 #         plt.show()
-print(agent.get_available_summaries())
 
 # Close agent and environment
 agent.close()

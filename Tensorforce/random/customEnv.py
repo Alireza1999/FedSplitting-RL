@@ -54,15 +54,15 @@ class CustomEnvironment(Environment):
             iotEnergyList.append(iotEnergy)
 
         # add a float number to reward using tanh activation function
-        reward += (utils.tanhActivation(maxTrainingTime / 5) * (-1)) + 1
+        #reward += (utils.tanhActivation(maxTrainingTime / 5) * (-1)) + 1
 
-        for i in range(self.edgeDeviceNum):
-            if edgeCapacity[i] < 0:
-                reward += edgeCapacity[i] / 5
+        # for i in range(self.edgeDeviceNum):
+        #     if edgeCapacity[i] < 0:
+        #         reward += edgeCapacity[i] / 5
 
         averageEnergyConsumption = totalEnergyConsumption / self.iotDeviceNum
         # add a float number to reward using tanh activation function
-        reward += (utils.tanhActivation(averageEnergyConsumption / 15) * (-1)) + 1
+        reward += utils.tanhActivation((-averageEnergyConsumption+5.5) / 6) + 1
 
         logger.info("Energy :\n {} \n".format(iotEnergyList[:self.iotDeviceNum + 1]))
         logger.info("Reward of this action :\n {} \n".format(reward))

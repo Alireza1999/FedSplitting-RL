@@ -6,7 +6,7 @@ import logging
 from matplotlib import pyplot as plt
 from tensorforce import Runner
 
-logging.basicConfig(filename="./Logs/TF_agent/info.log",
+logging.basicConfig(filename="./Logs/TF_agent_0.9_0.1/info.log",
                     format='%(message)s',
                     filemode='w')
 logger = logging.getLogger()
@@ -119,7 +119,7 @@ agent = Agent.create(
 #                          figSizeY=5,
 #                          x=x,
 #                          y=sumRewardOfEpisodes,
-#                          savePath="Graphs/TF_agent",
+#                          savePath="Graphs/TF_agent_0.9_0.1",
 #                          pictureName=f"TF_Reward_episode{i}")
 #
 #         utils.draw_graph(title="Avg Energy vs Episode",
@@ -129,7 +129,7 @@ agent = Agent.create(
 #                          figSizeY=5,
 #                          x=x,
 #                          y=energyConsumption,
-#                          savePath="Graphs/TF_agent",
+#                          savePath="Graphs/TF_agent_0.9_0.1",
 #                          pictureName=f"TF_Energy_episode{i}")
 #
 #     agent.experience(

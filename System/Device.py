@@ -5,7 +5,7 @@ import random
 
 
 class Device:
-    def __init__(self, deviceType: str = 'iotDevice', edgeIndex: int = 0, CPU: int = 2, bandwidth: float = 2.0,
+    def __init__(self, deviceType: str = 'cloud', edgeIndex: int = 0, CPU: int = 2, bandwidth: float = 2.0,
                  capacity: int = 5):
         # for Iot Device we use Edge index to find out each iot connected to which edge
         self.edgeIndex = int(edgeIndex)
@@ -15,8 +15,7 @@ class Device:
         self.capacity = int(capacity)
 
     def trainingTime(self, splitPoints: list) -> float:
-        if splitPoints[0] <= config.LAYER_NUM and splitPoints[1] <= config.LAYER_NUM:
-            compWorkLoad = 0
+        if splitPoints[0] < config.LAYER_NUM and config.LAYER_NUM > splitPoints[1] >= splitPoints[0]:
             sizeOfDataTransferred = 0
 
             if self.deviceType == 'iotDevice':
@@ -33,13 +32,13 @@ class Device:
                 else:
                     sizeOfDataTransferred = 0
             else:
-                compWorkLoad = sum(config.COMP_WORK_LOAD[splitPoints[1]:])
+                compWorkLoad = sum(config.COMP_WORK_LOAD[splitPoints[1] + 1:])
 
             computationTime = compWorkLoad / self.CPU
 
             effectiveBandwidth = []
             # 80% the bandwidth has not changed and 20% the bandwidth has decreased by 30%.
-            if (random.random() < 0.8):
+            if random.random() < 0.8:
                 communicationTime = sizeOfDataTransferred / self.bandwidth
                 effectiveBandwidth.append(self.bandwidth)
             else:
@@ -59,8 +58,10 @@ class Device:
                 sizeOfDataTransferred = 0
 
             computationTime = compWorkLoad / self.CPU
-            computationEnergy = computationTime * 1  # we assume 1 jule per megabyte energy consumed in data transmition
-            communicationEnergy = sizeOfDataTransferred * 0.1  # we assume 1 jule per megabyte energy consumed in data transmition
+            computationEnergy = computationTime * 1
+
+            communicationEnergy = sizeOfDataTransferred * 1
+
             return computationEnergy + communicationEnergy
         else:
             raise Exception("out of range split point!!")

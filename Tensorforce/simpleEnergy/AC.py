@@ -1,7 +1,7 @@
 from tensorforce import Agent, Environment
 from Tensorforce import utils
 from Tensorforce import config
-from Tensorforce.v0.customEnv_v0 import CustomEnvironment
+from Tensorforce.simpleEnergy.customEnv import CustomEnvironment
 import logging
 from matplotlib import pyplot as plt
 from tensorforce import Runner
@@ -25,11 +25,11 @@ print(avgEnergyWithoutSplitting)
 environment = Environment.create(
     environment=CustomEnvironment(iotDevices=iotDevices,
                                   edgeDevices=edgeDevices,
-                                  cloud=cloud,
-                                  energyWithoutSplitting=avgEnergyWithoutSplitting))
+                                  cloud=cloud))
 
 agent = Agent.create(
     agent='ac', environment=environment,
+    max_episode_timesteps=100,
     # Automatically configured network
     network='auto',
     # Optimization
@@ -46,9 +46,15 @@ agent = Agent.create(
     exploration=0.1, variable_noise=0.0,
     # Regularization
     l2_regularization=0.1, entropy_regularization=0.01,
+
+    summarizer=dict(directory="summaries/",
+                    frequency=50,
+                    labels='all'
+                    ),
+
     # TensorFlow etc
     name='agent', device=None, parallel_interactions=1, seed=None, execution=None, saver=None,
-    summarizer=None, recorder=None
+    recorder=None
 )
 
 sumRewardOfEpisodes = list()
@@ -117,8 +123,8 @@ AvgEnergyOfIotDevices = list()
 #     )
 #     agent.update()
 
-plt.hist(AvgEnergyOfIotDevices, 10)
-plt.show()
+# plt.hist(AvgEnergyOfIotDevices, 10)
+# plt.show()
 
 # Evaluate for 100 episodes
 # sum_rewards = 0.0
