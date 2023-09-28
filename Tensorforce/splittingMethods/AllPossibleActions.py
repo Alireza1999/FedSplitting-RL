@@ -1,18 +1,21 @@
 import logging
+import sys
+
+sys.path.append('/home/alireza_soleymani/UniversityWorks/Thesis/FedSplitting-RL')
 
 from Tensorforce import config
 from Tensorforce import utils
-from Tensorforce.simpleEnergy.customEnv import CustomEnvironment
+from Tensorforce.enviroments.customEnv import CustomEnvironment
 
-logging.basicConfig(filename="./Logs/AllPossibleAction/info.log",
-                    format='%(message)s',
-                    filemode='w')
-logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
+# logging.basicConfig(filename="../simpleEnergy/Logs/AllPossibleAction/info.log",
+#                     format='%(message)s',
+#                     filemode='w')
+# logger = logging.getLogger()
+# logger.setLevel(logging.DEBUG)
 
-iotDevices = utils.createDeviceFromCSV(csvFilePath="../../System/iotDevicesSmallScale.csv", deviceType='iotDevice')
-edgeDevices = utils.createDeviceFromCSV(csvFilePath="../../System/edgesSmallScale.csv", deviceType='edge')
-cloud = utils.createDeviceFromCSV(csvFilePath="../../System/cloud.csv")[0]
+iotDevices = utils.createDeviceFromCSV(csvFilePath="System/iotDevicesSmallScale.csv", deviceType='iotDevice')
+edgeDevices = utils.createDeviceFromCSV(csvFilePath="System/edgesSmallScale.csv", deviceType='edge')
+cloud = utils.createDeviceFromCSV(csvFilePath="System/cloud.csv")[0]
 
 energy = []
 trainingTime = []
@@ -34,35 +37,44 @@ max_trainingtime_splitting = []
 
 splittingLayer = utils.allPossibleSplitting(modelLen=config.LAYER_NUM - 1, deviceNumber=len(iotDevices))
 
-env = CustomEnvironment(iotDevices=iotDevices, edgeDevices=edgeDevices, cloud=cloud)
+env = CustomEnvironment(iotDevices=iotDevices, edgeDevices=edgeDevices, cloud=cloud, fraction=1)
 
 for splitting in splittingLayer:
     splittingArray = list()
     for char in splitting:
         splittingArray.append(int(char))
-    newReward, newState, newTrainingTime = env.rewardFun(splittingArray)
+    newReward, newState = env.rewardFun(splittingArray)
 
     if newState[0] < min_Energy:
         min_Energy = newState[0]
         min_energy_splitting = splittingArray
-        min_Energy_TrainingTime = newTrainingTime
+        min_Energy_TrainingTime = newState[1]
     if newState[0] > max_Energy:
         max_Energy = newState[0]
         max_Energy_splitting = splittingArray
-        max_Energy_TrainingTime = newTrainingTime
+        max_Energy_TrainingTime = newState[1]
 
-    if newTrainingTime < min_trainingTime:
-        min_trainingTime = newTrainingTime
+    if newState[1] < min_trainingTime:
+        min_trainingTime = newState[1]
         min_trainingtime_splitting = splittingArray
         min_trainingTime_energy = newState[0]
-    if newTrainingTime > max_trainingTime:
-        max_trainingTime = newTrainingTime
+    if newState[1] > max_trainingTime:
+        max_trainingTime = newState[1]
         max_trainingtime_splitting = splittingArray
         max_trainingTime_energy = newState[0]
 
     energy.append(newState[0])
     reward.append(newReward)
-    trainingTime.append(newTrainingTime)
+    trainingTime.append(newState[1])
+
+
+def getMinMaxEnergy():
+    return min_Energy, max_Energy
+
+
+def getMinMaxTrainingTime():
+    return min_trainingTime, max_trainingTime
+
 
 print(f"------------------------------------------------")
 print(f"MIN Energy : \n{min_Energy}")
@@ -84,19 +96,19 @@ print(f"MAX TrainingTime : {max_trainingTime}")
 print(f"MAX TrainingTime Splitting: {max_trainingtime_splitting}")
 print(f"MAX TrainingTime Energy: {max_trainingTime_energy}")
 
-logger.info(f"================================================")
-logger.info(f"MIN Energy : {min_Energy}")
-logger.info(f"MIN Energy Splitting: {min_energy_splitting}")
-logger.info(f"================================================")
-logger.info(f"Max Energy : {min_Energy}")
-logger.info(f"Max Energy Splitting: {min_energy_splitting}")
-
-logger.info(f"================================================")
-logger.info(f"MIN TrainingTime : {min_trainingTime}")
-logger.info(f"MIN TrainingTime Splitting: {min_trainingtime_splitting}")
-logger.info(f"================================================")
-logger.info(f"Max TrainingTime : {max_trainingTime}")
-logger.info(f"Max TrainingTime Splitting: {max_trainingtime_splitting}")
+# logger.info(f"================================================")
+# logger.info(f"MIN Energy : {min_Energy}")
+# logger.info(f"MIN Energy Splitting: {min_energy_splitting}")
+# logger.info(f"================================================")
+# logger.info(f"Max Energy : {min_Energy}")
+# logger.info(f"Max Energy Splitting: {min_energy_splitting}")
+#
+# logger.info(f"================================================")
+# logger.info(f"MIN TrainingTime : {min_trainingTime}")
+# logger.info(f"MIN TrainingTime Splitting: {min_trainingtime_splitting}")
+# logger.info(f"================================================")
+# logger.info(f"Max TrainingTime : {max_trainingTime}")
+# logger.info(f"Max TrainingTime Splitting: {max_trainingtime_splitting}")
 
 # utils.draw_hist(title='Avg Energy of IoT Devices [2 IOT device + 1 edge]',
 #                 x=energy,

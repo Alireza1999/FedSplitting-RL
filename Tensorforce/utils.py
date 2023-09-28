@@ -16,12 +16,11 @@ def createDeviceFromCSV(csvFilePath: str, deviceType: str = 'cloud') -> list[Dev
         for row in csvreader:
             if row[0] == 'CPU Core':
                 continue
-            if deviceType == 'cloud':
-                device = Device(deviceType=deviceType, CPU=int(row[0]), bandwidth=float(row[1]), edgeIndex=int(row[2]))
-            elif deviceType == 'edge':
-                device = Device(deviceType=deviceType, CPU=int(row[0]), bandwidth=float(row[1]), capacity=int(row[2]))
+            if deviceType == 'iotDevice':
+                device = Device(deviceType=deviceType, CPU=int(row[0]), bandwidth=float(row[1]), edgeIndex=int(row[2]),
+                                capacity=int(row[3]))
             else:
-                device = Device(deviceType=deviceType, CPU=int(row[0]), bandwidth=float(row[1]))
+                device = Device(deviceType=deviceType, CPU=int(row[0]), bandwidth=float(row[1]), capacity=int(row[2]))
 
             devices.append(device)
     return devices
@@ -30,46 +29,43 @@ def createDeviceFromCSV(csvFilePath: str, deviceType: str = 'cloud') -> list[Dev
 def draw_graph(figSizeX, figSizeY, x, y, title, xlabel, ylabel, savePath, pictureName, saveFig=True):
     # Create a plot
     plt.figure(figsize=(int(figSizeX), int(figSizeY)))  # Set the figure size
-    plt.plot(x, y)  # Plot the data
-    plt.title(title)  # Add a title
-    plt.xlabel(xlabel)  # Add x-axis label
-    plt.ylabel(ylabel)  # Add y-axis label
+    plt.plot(x, y)
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
 
     if saveFig:
         if not os.path.exists(savePath):
-            os.makedirs(savePath)  # Create the directory if it does not exist
-        plt.savefig(os.path.join(savePath, pictureName))  # Save the plot as PNG image
-    # Show the plot
-    plt.show()
+            os.makedirs(savePath)
+        plt.savefig(os.path.join(savePath, pictureName))
+    plt.close()
+    # plt.show()
 
 
 def draw_hist(x, title, xlabel, savePath, pictureName, saveFig=True):
     # Create a plot
     plt.hist(x, 10)
-    plt.title(title)  # Add a title
-    plt.xlabel(xlabel)  # Add x-axis label
+    plt.title(title)
+    plt.xlabel(xlabel)
     if saveFig:
         if not os.path.exists(savePath):
-            os.makedirs(savePath)  # Create the directory if it does not exist
-        plt.savefig(os.path.join(savePath, pictureName))  # Save the plot as PNG image
-
-    # Show the plot
-    plt.show()
+            os.makedirs(savePath)
+        plt.savefig(os.path.join(savePath, pictureName))
+    plt.close()
+    # plt.show()
 
 
 def draw_scatter(x, y, title, xlabel, ylabel, savePath, pictureName, saveFig=True):
-    # Create a plot
     plt.scatter(x, y)
-    plt.title(title)  # Add a title
-    plt.xlabel(xlabel)  # Add x-axis label
-    plt.ylabel(ylabel)  # Add y-axis label
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
     if saveFig:
         if not os.path.exists(savePath):
-            os.makedirs(savePath)  # Create the directory if it does not exist
-        plt.savefig(os.path.join(savePath, pictureName))  # Save the plot as PNG image
-
-    # Show the plot
-    plt.show()
+            os.makedirs(savePath)
+        plt.savefig(os.path.join(savePath, pictureName))
+    plt.close()
+    # plt.show()
 
 
 def draw_3dGraph(x, y, z, xlabel, ylabel, zlabel):
@@ -128,6 +124,14 @@ def tanhActivation(x: float) -> float:
     """ It returns the value (1-exp(-2x))/(1+exp(-2x)) and the value returned will be lies in between -1 to 1."""
 
     return np.tanh(x)
+
+
+def normalizeReward(maxAmount, minAmount, x):
+    P = [maxAmount, 0]
+    Q = [minAmount, 1]
+    lineGradient = (P[1] - Q[1]) / (P[0] - Q[0])
+    y = lineGradient * (x - Q[0]) + Q[1]
+    return y
 
 
 def convert_To_Len_th_base(n, arr, modelLen, deviceNumber, allPossible):

@@ -14,7 +14,7 @@ class Device:
         self.deviceType = str(deviceType)
         self.capacity = int(capacity)
 
-    def trainingTime(self, splitPoints: list) -> float:
+    def trainingTime(self, splitPoints: list, preTrain=False) -> tuple[float, float]:
         if splitPoints[0] < config.LAYER_NUM and config.LAYER_NUM > splitPoints[1] >= splitPoints[0]:
             sizeOfDataTransferred = 0
 
@@ -36,14 +36,17 @@ class Device:
 
             computationTime = compWorkLoad / self.CPU
 
-            effectiveBandwidth = []
-            # 80% the bandwidth has not changed and 20% the bandwidth has decreased by 30%.
-            if random.random() < 0.8:
-                communicationTime = sizeOfDataTransferred / self.bandwidth
-                effectiveBandwidth.append(self.bandwidth)
+            if not preTrain:
+                effectiveBandwidth = 0
+                # 80% the bandwidth has not changed and 20% the bandwidth has decreased by 30%.
+                if random.random() < 0.8:
+                    communicationTime = sizeOfDataTransferred / self.bandwidth
+                    effectiveBandwidth = self.bandwidth
+                else:
+                    communicationTime = sizeOfDataTransferred / (self.bandwidth * 0.7)
+                    effectiveBandwidth = self.bandwidth * 0.7
             else:
-                communicationTime = sizeOfDataTransferred / (self.bandwidth * 0.7)
-                effectiveBandwidth.append(self.bandwidth * 0.7)
+                communicationTime = sizeOfDataTransferred / 0.7 * self.bandwidth
 
             return communicationTime + computationTime
         else:

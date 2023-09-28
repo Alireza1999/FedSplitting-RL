@@ -1,11 +1,11 @@
 import logging
 
-import numpy as np
 from tensorforce import Environment
 
-import Tensorforce.config as config
 from System.Device import Device
+from Tensorforce import config
 from Tensorforce import utils
+import numpy as np
 
 logger = logging.getLogger()
 
@@ -23,21 +23,6 @@ class CustomEnvironment(Environment):
         self.edgeDevices: list[Device] = edgeDevices
         self.cloud: Device = cloud
 
-        self.trainingTime = list()
-
-    def states(self):
-        # State = [AvgEnergy, TrainingTime, edgeCapacity, cloudCapacity, prevAction ]
-        return dict(type="float", shape=(1 + 1 + self.edgeDeviceNum + 1 + self.iotDeviceNum * 2))
-
-    def actions(self):
-        return dict(type="float", shape=(self.iotDeviceNum * 2,), min_value=0.0, max_value=1.0)
-
-    def max_episode_timesteps(self):
-        return super().max_episode_timesteps()
-
-    def close(self):
-        super().close()
-
     def reset(self):
         randActions = np.random.uniform(low=0.0, high=1.0, size=(self.iotDeviceNum * 2))
         reward, newState = self.rewardFun(randActions)
@@ -50,8 +35,6 @@ class CustomEnvironment(Environment):
         state.append(randCloudCapacity)
         state.extend(randActions)
         return state
-        # temp = np.append(randEnergy, randTrainingTime)
-        # return np.append(temp, randActions)
 
     def rewardFun(self, actions):
         totalEnergyConsumption = 0
@@ -90,18 +73,21 @@ class CustomEnvironment(Environment):
             totalEnergyConsumption += iotEnergy
 
         averageEnergyConsumption = totalEnergyConsumption / self.iotDeviceNum
-        rewardOfEnergy = utils.tanhActivation((-averageEnergyConsumption + 43.5) / 30) + 1
-        # rewardOfTrainingTime = utils.tanhActivation((-maxTrainingTime + 120) / 200) + 1
-        rewardOfTrainingTime = (-1/300) * maxTrainingTime + (120/300) + 1
-        reward = (0.5 * rewardOfEnergy) + (0.5 * rewardOfTrainingTime)
+        rewardOfEnergy = utils.normalizeReward(maxAmount=self.maxEnergy, minAmount=self.minEnergy,
+                                               x=averageEnergyConsumption)
+        rewardOfTrainingTime = utils.normalizeReward(self.maxTrainingTime, self.minTrainingTime, maxTrainingTime)
+        if self.fraction <= 1:
+            reward = (self.fraction * rewardOfEnergy) + ((1 - self.fraction) * rewardOfTrainingTime)
+        else:
+            raise Exception("Fraction must be less than 1")
 
         logger.info("-------------------------------------------")
         logger.info(f"Offloading layer : {offloadingPointsList} \n")
         logger.info(f"Avg Energy : {averageEnergyConsumption} \n")
         logger.info(f"Training time : {maxTrainingTime} \n")
         logger.info(f"Reward of this action : {reward} \n")
-        logger.info(f"Reward of energy : {0.5 * rewardOfEnergy} \n")
-        logger.info(f"Reward of training time : {0.5 * rewardOfTrainingTime} \n")
+        logger.info(f"Reward of energy : {self.fraction * rewardOfEnergy} \n")
+        logger.info(f"Reward of training time : {(1 - self.fraction) * rewardOfTrainingTime} \n")
         logger.info(f"Edges Capacities : {edgeCapacity} \n")
         logger.info(f"Cloud Capacities : {cloudCapacity} \n")
 
@@ -109,20 +95,9 @@ class CustomEnvironment(Environment):
         newState.extend(edgeCapacity)
         newState.append(cloudCapacity)
         newState.extend(actions)
-        # temp = np.append(averageEnergyConsumption, maxTrainingTime)
-        # newState = np.append(temp, actions)
         return reward, newState
 
-    def execute(self, actions: list):
+    def execute(self, actions):
         terminal = False
         reward, newState = self.rewardFun(actions)
         return newState, terminal, reward
-
-    def getTrainingTime(self):
-        return self.trainingTime
-
-    def deleteTrainingTime(self):
-        self.trainingTime = []
-
-    def appendToTrainingTime(self, data):
-        self.trainingTime.append(data)

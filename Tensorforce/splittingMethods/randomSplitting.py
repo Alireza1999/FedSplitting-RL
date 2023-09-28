@@ -1,5 +1,5 @@
 import numpy as np
-from Tensorforce.random.customEnv import CustomEnvironment
+from Tensorforce.enviroments.customEnv_random import CustomEnvironment
 import Tensorforce.utils as utils
 
 iotDevices = utils.createDeviceFromCSV(csvFilePath="../../System/iotDevicesSmallScale.csv", deviceType='iotDevice')
