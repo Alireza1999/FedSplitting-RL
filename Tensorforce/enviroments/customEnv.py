@@ -61,6 +61,8 @@ class CustomEnvironment(Environment):
         totalEnergyConsumption = 0
         maxTrainingTime = 0
         offloadingPointsList = []
+
+        iotDeviceCapacity = [iotdevice.capacity for iotdevice in self.iotDevices]
         edgeCapacity = [edges.capacity for edges in self.edgeDevices]
         cloudCapacity = self.cloud.capacity
 
@@ -68,6 +70,7 @@ class CustomEnvironment(Environment):
             op1, op2 = utils.actionToLayer(actions[i:i + 2])
             cloudCapacity -= sum(config.COMP_WORK_LOAD[op2 + 1:])
             edgeCapacity[self.iotDevices[int(i / 2)].edgeIndex] -= sum(config.COMP_WORK_LOAD[op1 + 1:op2 + 1])
+            iotDeviceCapacity[int(i / 2)] -= sum(config.COMP_WORK_LOAD[0:op1 + 1])
 
         for i in range(0, len(actions), 2):
             # Mapping float number to Offloading points
@@ -80,6 +83,8 @@ class CustomEnvironment(Environment):
             edgeTrainingTime = self.edgeDevices[self.iotDevices[int(i / 2)].edgeIndex].trainingTime([op1, op2])
             cloudTrainingTime = self.cloud.trainingTime([op1, op2])
 
+            if iotDeviceCapacity[int(i / 2)] < 0:
+                iotTrainingTime *= (1 + abs(iotDeviceCapacity[int(i / 2)]) / 10)
             if edgeCapacity[self.iotDevices[int(i / 2)].edgeIndex] < 0 and (actions[i] != actions[i + 1]):
                 edgeTrainingTime *= (1 + abs(edgeCapacity[self.iotDevices[int(i / 2)].edgeIndex]) / 10)
             if cloudCapacity < 0 and actions[i + 1] < config.LAYER_NUM - 1:

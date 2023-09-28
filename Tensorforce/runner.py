@@ -2,7 +2,8 @@ import logging
 import numpy as np
 from tensorforce import Agent, Environment
 from Tensorforce import utils
-from Tensorforce.enviroments import customEnv_random, customEnv
+from Tensorforce.enviroments import customEnv
+from Tensorforce.splittingMethods import randomAgent
 from Tensorforce import config as conf
 from pathlib import Path
 
@@ -44,8 +45,7 @@ class Runner:
         env = createEnv(rewardTuningParams=rewardTuningParams,
                         iotDevices=iotDevices, edgeDevices=edgeDevices, cloud=cloud,
                         timestepNum=self.timestepNum,
-                        fraction=self.fraction,
-                        agentType=self.agentType)
+                        fraction=self.fraction)
 
         agent = createAgent(agentType=self.agentType,
                             fraction=self.fraction,
@@ -159,7 +159,6 @@ class Runner:
             ylabel="Training Time",
             zlabel="reward"
         )
-
 
         agent.close()
         env.close()
@@ -308,6 +307,10 @@ def createPPOAgent(agentType, fraction, environment, timestepNum, saveSummariesP
     )
 
 
+def createRandomAgent(environment):
+    return randomAgent.RandomAgent.create(agent='random', environment=environment)
+
+
 def createAgent(agentType, fraction, timestepNum, environment, saveSummariesPath):
     if agentType == 'ppo':
         return createPPOAgent(agentType=agentType, fraction=fraction, environment=environment, timestepNum=timestepNum,
@@ -318,23 +321,17 @@ def createAgent(agentType, fraction, timestepNum, environment, saveSummariesPath
     elif agentType == 'tensorforce':
         return createTensorforceAgent(agentType=agentType, fraction=fraction, environment=environment,
                                       timestepNum=timestepNum, saveSummariesPath=saveSummariesPath)
-    else:
-        raise Exception('Invalid config select from [energyOnly, energyTrainingTime, random]')
-
-
-def createEnv(agentType, timestepNum, iotDevices, edgeDevices, cloud, fraction, rewardTuningParams) -> Environment:
-    if agentType != 'random':
-        return Environment.create(
-            environment=customEnv.CustomEnvironment(rewardTuningParams=rewardTuningParams, iotDevices=iotDevices,
-                                                    edgeDevices=edgeDevices, cloud=cloud, fraction=fraction),
-            max_episode_timesteps=timestepNum)
     elif agentType == 'random':
-        return Environment.create(
-            environment=customEnv_random.CustomEnvironment(iotDevices=iotDevices, edgeDevices=edgeDevices,
-                                                           cloud=cloud),
-            max_episode_timesteps=timestepNum)
+        return createRandomAgent(environment=environment)
     else:
-        raise Exception('Invalid config select from [energyOnly, energyTrainingTime, random]')
+        raise Exception('Invalid config select from [ppo, ac, tensorforce, random]')
+
+
+def createEnv(timestepNum, iotDevices, edgeDevices, cloud, fraction, rewardTuningParams) -> Environment:
+    return Environment.create(
+        environment=customEnv.CustomEnvironment(rewardTuningParams=rewardTuningParams, iotDevices=iotDevices,
+                                                edgeDevices=edgeDevices, cloud=cloud, fraction=fraction),
+        max_episode_timesteps=timestepNum)
 
 
 def createLog(fileName):
@@ -350,6 +347,8 @@ def preTrainEnv(iotDevices, edgeDevices, cloud, actions):
     totalEnergyConsumption = 0
     maxTrainingTime = 0
     offloadingPointsList = []
+
+    iotDeviceCapacity = [iotDevice.capacity for iotDevice in iotDevices]
     edgeCapacity = [edges.capacity for edges in edgeDevices]
     cloudCapacity = cloud.capacity
 
@@ -358,6 +357,7 @@ def preTrainEnv(iotDevices, edgeDevices, cloud, actions):
         op2 = actions[i + 1]
         cloudCapacity -= sum(conf.COMP_WORK_LOAD[op2 + 1:])
         edgeCapacity[iotDevices[int(i / 2)].edgeIndex] -= sum(conf.COMP_WORK_LOAD[op1 + 1:op2 + 1])
+        iotDeviceCapacity[int(i / 2)] -= sum(conf.COMP_WORK_LOAD[0:op1 + 1])
 
     for i in range(0, len(actions), 2):
         # Mapping float number to Offloading points
@@ -371,6 +371,8 @@ def preTrainEnv(iotDevices, edgeDevices, cloud, actions):
         edgeTrainingTime = edgeDevices[iotDevices[int(i / 2)].edgeIndex].trainingTime([op1, op2], preTrain=True)
         cloudTrainingTime = cloud.trainingTime([op1, op2], preTrain=True)
 
+        if iotDeviceCapacity[int(i / 2)] < 0:
+            iotTrainingTime *= (1 + abs(iotDeviceCapacity[int(i / 2)]) / 10)
         if edgeCapacity[iotDevices[int(i / 2)].edgeIndex] < 0 and (actions[i] != actions[i + 1]):
             edgeTrainingTime *= (1 + abs(edgeCapacity[iotDevices[int(i / 2)].edgeIndex]) / 10)
         if cloudCapacity < 0 and actions[i + 1] < conf.LAYER_NUM - 1:
