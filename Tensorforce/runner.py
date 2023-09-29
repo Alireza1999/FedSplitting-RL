@@ -1,9 +1,9 @@
 import logging
 import numpy as np
-from tensorforce import Agent, Environment
+from tensorforce import Environment
 from Tensorforce import utils
 from Tensorforce.enviroments import customEnv
-from Tensorforce.splittingMethods import randomAgent
+from Tensorforce.splittingMethods import randomAgent, AC, PPO, Tensorforce
 from Tensorforce import config as conf
 from pathlib import Path
 
@@ -164,165 +164,18 @@ class Runner:
         env.close()
 
 
-def createTensorforceAgent(agentType, fraction, environment, timestepNum, saveSummariesPath) -> Agent:
-    return Agent.create(
-        agent='tensorforce',
-        environment=environment,
-        max_episode_timesteps=timestepNum,
-
-        # Reward estimation
-        reward_estimation=dict(
-            horizon=1,
-            discount=0.96),
-
-        # Optimizer
-        optimizer=dict(
-            optimizer='adam', learning_rate=0.001, clipping_threshold=0.01,
-            multi_step=10, subsampling_fraction=0.99
-        ),
-
-        # update network every 2 timestep
-        update=dict(
-            unit='timesteps',
-            batch_size=2,
-        ),
-
-        policy=dict(
-            type='parametrized_distributions',
-            network='auto',
-            distributions=dict(
-                float=dict(type='gaussian'),
-                bounded_action=dict(type='beta')
-            ),
-            temperature=dict(
-                type='decaying', decay='exponential', unit='timesteps',
-                decay_steps=5, initial_value=0.01, decay_rate=0.5
-            )
-        ),
-
-        objective='policy_gradient',
-        # Preprocessing
-        preprocessing=None,
-
-        # Exploration
-        exploration=0.1, variable_noise=0.0,
-
-        # Regularization
-        l2_regularization=0.5, entropy_regularization=0.1,
-        memory=200,
-        # TensorFlow etc
-        # saver=dict(directory='model', filename='model'),
-        summarizer=dict(directory=f"{saveSummariesPath}/summaries/{agentType}_{fraction}",
-                        frequency=50,
-                        labels='all',
-                        ),
-        recorder=None,
-
-        # Config
-        config=dict(name='agent',
-                    device="GPU",
-                    parallel_interactions=1,
-                    seed=None,
-                    execution=None,
-                    )
-    )
-
-
-def createACAgents(agentType, fraction, environment, timestepNum, saveSummariesPath) -> Agent:
-    return Agent.create(
-        agent='ac',
-        environment=environment,
-        max_episode_timesteps=timestepNum,
-        # Automatically configured network
-        network='auto',
-        # Optimization
-        batch_size=10, update_frequency=2, learning_rate=0.0001,
-        # Reward estimation
-        discount=0.99, estimate_terminal=False,
-        # Critic
-        horizon=1,
-        critic_network='auto',
-        critic_optimizer=dict(optimizer='adam', multi_step=10, learning_rate=0.0001),
-        # Preprocessing
-        preprocessing=None,
-        # Exploration
-        exploration=0.1, variable_noise=0.0,
-        # Regularization
-        l2_regularization=0.1, entropy_regularization=0.01,
-        # TensorFlow etc
-        name='agent',
-        device=None,
-        parallel_interactions=1,
-        seed=None,
-        execution=None,
-        saver=None,
-        summarizer=dict(directory=f"{saveSummariesPath}/summaries/{agentType}_{fraction}",
-                        frequency=50,
-                        labels='all',
-                        ),
-        recorder=None
-    )
-
-
-def createPPOAgent(agentType, fraction, environment, timestepNum, saveSummariesPath) -> Agent:
-    return Agent.create(
-        agent='ppo',
-        environment=environment,
-        max_episode_timesteps=timestepNum,
-        # Automatically configured network
-        network='auto',
-
-        # Optimization
-        batch_size=5, update_frequency=5, learning_rate=1e-5, subsampling_fraction=0.2,
-        optimization_steps=5,
-
-        # Reward estimation
-        likelihood_ratio_clipping=0.2, discount=0.96, estimate_terminal=False,
-
-        # Critic
-        critic_network='auto',
-        critic_optimizer=dict(optimizer='adam', multi_step=10, learning_rate=1e-5),
-
-        # Preprocessing
-        preprocessing=None,
-
-        # Exploration
-        exploration=0.1, variable_noise=0.0,
-
-        # Regularization
-        l2_regularization=0.0, entropy_regularization=0.2,
-
-        # TensorFlow etc
-        name='agent',
-        device=None,
-        parallel_interactions=1,
-        seed=None,
-        execution=None,
-        saver=None,
-        summarizer=dict(directory=f"{saveSummariesPath}/summaries/{agentType}_{fraction}",
-                        frequency=50,
-                        labels='all',
-                        ),
-        recorder=None
-    )
-
-
-def createRandomAgent(environment):
-    return randomAgent.RandomAgent.create(agent='random', environment=environment)
-
-
 def createAgent(agentType, fraction, timestepNum, environment, saveSummariesPath):
     if agentType == 'ppo':
-        return createPPOAgent(agentType=agentType, fraction=fraction, environment=environment, timestepNum=timestepNum,
-                              saveSummariesPath=saveSummariesPath)
+        return PPO.create(fraction=fraction, environment=environment, timestepNum=timestepNum,
+                          saveSummariesPath=saveSummariesPath)
     elif agentType == 'ac':
-        return createACAgents(agentType=agentType, fraction=fraction, environment=environment, timestepNum=timestepNum,
-                              saveSummariesPath=saveSummariesPath)
+        return AC.create(fraction=fraction, environment=environment, timestepNum=timestepNum,
+                         saveSummariesPath=saveSummariesPath)
     elif agentType == 'tensorforce':
-        return createTensorforceAgent(agentType=agentType, fraction=fraction, environment=environment,
-                                      timestepNum=timestepNum, saveSummariesPath=saveSummariesPath)
+        return Tensorforce.create(fraction=fraction, environment=environment,
+                                  timestepNum=timestepNum, saveSummariesPath=saveSummariesPath)
     elif agentType == 'random':
-        return createRandomAgent(environment=environment)
+        return randomAgent.RandomAgent.create(agent='random', environment=environment)
     else:
         raise Exception('Invalid config select from [ppo, ac, tensorforce, random]')
 

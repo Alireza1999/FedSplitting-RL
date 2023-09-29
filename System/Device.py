@@ -1,5 +1,3 @@
-import sys
-# sys.path.insert(0, '/home/alireza_soleymani/UniversityWorks/Thesis/RL/Tensorforce')
 import Tensorforce.config as config
 import random
 
