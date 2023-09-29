@@ -3,7 +3,7 @@ import numpy as np
 from tensorforce import Environment
 from Tensorforce import utils
 from Tensorforce.enviroments import customEnv
-from Tensorforce.splittingMethods import randomAgent, AC, PPO, Tensorforce
+from Tensorforce.splittingMethods import RandomAgent, NoSplitting, AC, PPO, TensorforceAgent
 from Tensorforce import config as conf
 from pathlib import Path
 
@@ -172,10 +172,12 @@ def createAgent(agentType, fraction, timestepNum, environment, saveSummariesPath
         return AC.create(fraction=fraction, environment=environment, timestepNum=timestepNum,
                          saveSummariesPath=saveSummariesPath)
     elif agentType == 'tensorforce':
-        return Tensorforce.create(fraction=fraction, environment=environment,
-                                  timestepNum=timestepNum, saveSummariesPath=saveSummariesPath)
+        return TensorforceAgent.create(fraction=fraction, environment=environment,
+                                       timestepNum=timestepNum, saveSummariesPath=saveSummariesPath)
     elif agentType == 'random':
-        return randomAgent.RandomAgent.create(agent='random', environment=environment)
+        return RandomAgent.RandomAgent(environment=environment)
+    elif agentType == 'NoSplitting':
+        return NoSplitting.NoSplitting(environment=environment)
     else:
         raise Exception('Invalid config select from [ppo, ac, tensorforce, random]')
 
