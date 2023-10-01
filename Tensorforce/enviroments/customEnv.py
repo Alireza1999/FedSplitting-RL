@@ -84,11 +84,12 @@ class CustomEnvironment(Environment):
             cloudTrainingTime = self.cloud.trainingTime([op1, op2])
 
             if iotDeviceCapacity[int(i / 2)] < 0:
-                iotTrainingTime *= (1 + abs(iotDeviceCapacity[int(i / 2)]) / 10)
+                iotTrainingTime += abs(iotDeviceCapacity[int(i / 2)])
             if edgeCapacity[self.iotDevices[int(i / 2)].edgeIndex] < 0 and (actions[i] != actions[i + 1]):
-                edgeTrainingTime *= (1 + abs(edgeCapacity[self.iotDevices[int(i / 2)].edgeIndex]) / 10)
+                edgeTrainingTime += 5*abs(edgeCapacity[self.iotDevices[int(i / 2)].edgeIndex])
             if cloudCapacity < 0 and actions[i + 1] < config.LAYER_NUM - 1:
-                cloudTrainingTime *= (1 + abs(cloudCapacity) / 10)
+                cloudTrainingTime += 2*abs(cloudCapacity)
+
 
             totalTrainingTime = iotTrainingTime + edgeTrainingTime + cloudTrainingTime
             if totalTrainingTime > maxTrainingTime:
@@ -118,6 +119,7 @@ class CustomEnvironment(Environment):
         logger.info(f"Reward of this action : {reward} \n")
         logger.info(f"Reward of energy : {self.fraction * rewardOfEnergy} \n")
         logger.info(f"Reward of training time : {(1 - self.fraction) * rewardOfTrainingTime} \n")
+        logger.info(f"IOTs Capacities : {iotDeviceCapacity} \n")
         logger.info(f"Edges Capacities : {edgeCapacity} \n")
         logger.info(f"Cloud Capacities : {cloudCapacity} \n")
 

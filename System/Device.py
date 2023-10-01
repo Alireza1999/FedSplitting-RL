@@ -12,32 +12,41 @@ class Device:
         self.deviceType = str(deviceType)
         self.capacity = int(capacity)
 
-    def trainingTime(self, splitPoints: list, preTrain=False) -> tuple[float, float]:
+    def trainingTime(self, splitPoints: list, preTrain=False, batchSize=200) -> float:
+        communicationTime = 0
+        computationTime = 0
         if splitPoints[0] < config.LAYER_NUM and config.LAYER_NUM > splitPoints[1] >= splitPoints[0]:
-            sizeOfDataTransferred = 0
+            sizeOfDataTransferred = 0.0
+            compWorkLoad = 0.0
+            for _ in range(batchSize):
+                if self.deviceType == 'iotDevice':
+                    compWorkLoad += sum(config.COMP_WORK_LOAD[:splitPoints[0] + 1])
+                    if splitPoints[0] < config.LAYER_NUM - 1:
+                        sizeOfDataTransferred += config.SIZE_OF_PARAM[splitPoints[0]]
+                    else:
+                        sizeOfDataTransferred = 0
 
+                elif self.deviceType == 'edge':
+                    compWorkLoad += sum(config.COMP_WORK_LOAD[splitPoints[0] + 1:splitPoints[1] + 1])
+                    if splitPoints[1] < config.LAYER_NUM - 1:
+                        sizeOfDataTransferred += config.SIZE_OF_PARAM[splitPoints[1]]
+                    else:
+                        sizeOfDataTransferred = 0
+                else:
+                    compWorkLoad += sum(config.COMP_WORK_LOAD[splitPoints[1] + 1:])
+
+                computationTime = compWorkLoad / self.CPU
+
+            # End of epoch and sending model to cloud
             if self.deviceType == 'iotDevice':
-                compWorkLoad = sum(config.COMP_WORK_LOAD[:splitPoints[0] + 1])
-                if splitPoints[0] < config.LAYER_NUM - 1:
-                    sizeOfDataTransferred = config.SIZE_OF_PARAM[splitPoints[0]]
-                else:
-                    sizeOfDataTransferred = 0
-
+                sizeOfDataTransferred += sum(config.SIZE_OF_PARAM[:splitPoints[0]])
             elif self.deviceType == 'edge':
-                compWorkLoad = sum(config.COMP_WORK_LOAD[splitPoints[0] + 1:splitPoints[1] + 1])
-                if splitPoints[1] < config.LAYER_NUM - 1:
-                    sizeOfDataTransferred = config.SIZE_OF_PARAM[splitPoints[1]]
-                else:
-                    sizeOfDataTransferred = 0
-            else:
-                compWorkLoad = sum(config.COMP_WORK_LOAD[splitPoints[1] + 1:])
-
-            computationTime = compWorkLoad / self.CPU
+                sizeOfDataTransferred += sum(config.SIZE_OF_PARAM[splitPoints[0] + 1:splitPoints[1]])
 
             if not preTrain:
                 effectiveBandwidth = 0
                 # 80% the bandwidth has not changed and 20% the bandwidth has decreased by 30%.
-                if random.random() < 0.8:
+                if random.uniform(a=0.0, b=1.0) < 0.8:
                     communicationTime = sizeOfDataTransferred / self.bandwidth
                     effectiveBandwidth = self.bandwidth
                 else:

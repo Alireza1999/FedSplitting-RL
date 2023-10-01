@@ -92,7 +92,7 @@ def actionToLayer(splitDecision: list[float]) -> tuple[int, int]:
     op2: int  # Offloading points op1, op2
 
     op1_workload = splitDecision[0] * totalWorkLoad
-    for i in range(1, config.LAYER_NUM):
+    for i in range(0, config.LAYER_NUM):
         difference = abs(sum(config.COMP_WORK_LOAD[:i + 1]) - op1_workload)
         temp2 = abs(sum(config.COMP_WORK_LOAD[:i + 2]) - op1_workload)
         if temp2 >= difference:

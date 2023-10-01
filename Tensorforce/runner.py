@@ -100,7 +100,7 @@ class Runner:
             trainingTimeOfAllTimesteps = np.append(trainingTimeOfAllTimesteps, episode_trainingTime)
 
             x.append(i)
-            if i != 0 and i % int(self.episodeNum / 4) == 0:
+            if i != 0 and i % int(self.episodeNum / 2) == 0:
                 utils.draw_graph(title="Reward vs Episode",
                                  xlabel="Episode",
                                  ylabel="Reward",
@@ -176,7 +176,7 @@ def createAgent(agentType, fraction, timestepNum, environment, saveSummariesPath
                                        timestepNum=timestepNum, saveSummariesPath=saveSummariesPath)
     elif agentType == 'random':
         return RandomAgent.RandomAgent(environment=environment)
-    elif agentType == 'NoSplitting':
+    elif agentType == 'noSplitting':
         return NoSplitting.NoSplitting(environment=environment)
     else:
         raise Exception('Invalid config select from [ppo, ac, tensorforce, random]')
@@ -227,11 +227,11 @@ def preTrainEnv(iotDevices, edgeDevices, cloud, actions):
         cloudTrainingTime = cloud.trainingTime([op1, op2], preTrain=True)
 
         if iotDeviceCapacity[int(i / 2)] < 0:
-            iotTrainingTime *= (1 + abs(iotDeviceCapacity[int(i / 2)]) / 10)
+            iotTrainingTime += abs(iotDeviceCapacity[int(i / 2)])
         if edgeCapacity[iotDevices[int(i / 2)].edgeIndex] < 0 and (actions[i] != actions[i + 1]):
-            edgeTrainingTime *= (1 + abs(edgeCapacity[iotDevices[int(i / 2)].edgeIndex]) / 10)
+            edgeTrainingTime += 5*abs(edgeCapacity[iotDevices[int(i / 2)].edgeIndex])
         if cloudCapacity < 0 and actions[i + 1] < conf.LAYER_NUM - 1:
-            cloudTrainingTime *= (1 + abs(cloudCapacity) / 10)
+            cloudTrainingTime += 2*abs(cloudCapacity)
 
         totalTrainingTime = iotTrainingTime + edgeTrainingTime + cloudTrainingTime
         if totalTrainingTime > maxTrainingTime:
@@ -247,11 +247,11 @@ def preTrainEnv(iotDevices, edgeDevices, cloud, actions):
 
 
 def preTrain(iotDevices, edgeDevices, cloud):
-    rewardTuningParams = [10000, 0, 10000, 0]
-    min_Energy = 10000
+    rewardTuningParams = [0, 0, 0, 0]
+    min_Energy = 1.0e7
     max_Energy = 0
 
-    min_trainingTime = 10000
+    min_trainingTime = 1.0e7
     max_trainingTime = 0
 
     splittingLayer = utils.allPossibleSplitting(modelLen=conf.LAYER_NUM - 1, deviceNumber=len(iotDevices))
