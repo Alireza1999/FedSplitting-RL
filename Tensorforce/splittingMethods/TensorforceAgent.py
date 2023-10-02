@@ -21,7 +21,7 @@ def create(fraction, environment, timestepNum, saveSummariesPath):
         # update network every 2 timestep
         update=dict(
             unit='timesteps',
-            batch_size=2,
+            batch_size=10,
         ),
 
         policy=dict(
@@ -45,7 +45,7 @@ def create(fraction, environment, timestepNum, saveSummariesPath):
         exploration=0.1, variable_noise=0.0,
 
         # Regularization
-        l2_regularization=0.5, entropy_regularization=0.1,
+        l2_regularization=0.1, entropy_regularization=0.1,
         memory=200,
         # TensorFlow etc
         # saver=dict(directory='model', filename='model'),

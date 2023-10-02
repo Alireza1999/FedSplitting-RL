@@ -143,7 +143,7 @@ def convert_To_Len_th_base(n, arr, modelLen, deviceNumber, allPossible):
 
 
 def allPossibleSplitting(modelLen, deviceNumber):
-    arr = [i for i in range(1, modelLen + 1)]
+    arr = [i for i in range(0, modelLen + 1)]
     allPossible = list()
     for i in range(pow(modelLen, deviceNumber * 2)):
         # Convert i to Len th base

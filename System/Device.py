@@ -12,7 +12,7 @@ class Device:
         self.deviceType = str(deviceType)
         self.capacity = int(capacity)
 
-    def trainingTime(self, splitPoints: list, preTrain=False, batchSize=200) -> float:
+    def trainingTime(self, splitPoints: list, preTrain: bool = False, batchSize: int = 50) -> float:
         communicationTime = 0
         computationTime = 0
         if splitPoints[0] < config.LAYER_NUM and config.LAYER_NUM > splitPoints[1] >= splitPoints[0]:
@@ -59,13 +59,21 @@ class Device:
         else:
             raise Exception("out of range split point!!")
 
-    def energyConsumption(self, splitPoints) -> float:
+    def energyConsumption(self, splitPoints, batchSize: int = 50) -> float:
+        compWorkLoad = 0
+        sizeOfDataTransferred = 0
         if splitPoints[0] <= config.LAYER_NUM and splitPoints[1] <= config.LAYER_NUM:
-            compWorkLoad = sum(config.COMP_WORK_LOAD[:splitPoints[0] + 1])
-            if splitPoints[0] < config.LAYER_NUM - 1:
-                sizeOfDataTransferred = config.SIZE_OF_PARAM[splitPoints[0]]
-            else:
-                sizeOfDataTransferred = 0
+
+            for _ in range(batchSize):
+                compWorkLoad += sum(config.COMP_WORK_LOAD[:splitPoints[0] + 1])
+                if splitPoints[0] < config.LAYER_NUM - 1:
+                    sizeOfDataTransferred += config.SIZE_OF_PARAM[splitPoints[0]]
+                else:
+                    sizeOfDataTransferred = 0
+
+            # End of epoch and sending model to cloud
+            if self.deviceType == 'iotDevice':
+                sizeOfDataTransferred += sum(config.SIZE_OF_PARAM[:splitPoints[0]])
 
             computationTime = compWorkLoad / self.CPU
             computationEnergy = computationTime * 1
