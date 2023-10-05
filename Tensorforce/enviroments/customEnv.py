@@ -86,9 +86,9 @@ class CustomEnvironment(Environment):
             if iotDeviceCapacity[int(i / 2)] < 0:
                 iotTrainingTime += abs(iotDeviceCapacity[int(i / 2)])
             if edgeCapacity[self.iotDevices[int(i / 2)].edgeIndex] < 0 and (actions[i] != actions[i + 1]):
-                edgeTrainingTime += 10*abs(edgeCapacity[self.iotDevices[int(i / 2)].edgeIndex])
+                edgeTrainingTime += 50 * abs(edgeCapacity[self.iotDevices[int(i / 2)].edgeIndex])
             if cloudCapacity < 0 and actions[i + 1] < config.LAYER_NUM - 1:
-                cloudTrainingTime += 30*abs(cloudCapacity)
+                cloudTrainingTime += 50 * abs(cloudCapacity)
 
             totalTrainingTime = iotTrainingTime + edgeTrainingTime + cloudTrainingTime
             if totalTrainingTime > maxTrainingTime:

@@ -6,7 +6,7 @@ import argparse
 from Tensorforce import runner
 
 arguments = {
-    '-a': ['--agent', 'tensorforce', '[String] name of the RL agent[ppo, ac, tensorforce, random, noSplitting]'],
+    '-a': ['--agent', 'tensorforce', '[String] name of the RL agent[ppo, ac, trpo, tensorforce, random, noSplitting]'],
     '-f': ['--fraction', 0.8, '[float] The fraction of energy and training time that is used for training RL'],
     '-e': ['--episode', 501, '[int] Number of episodes'],
     '-t': ['--timestep', 200, '[int] Number of timestep of each episode'],

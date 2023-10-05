@@ -43,17 +43,19 @@ class Device:
             elif self.deviceType == 'edge':
                 sizeOfDataTransferred += sum(config.SIZE_OF_PARAM[splitPoints[0] + 1:splitPoints[1]])
 
-            if not preTrain:
-                effectiveBandwidth = 0
-                # 80% the bandwidth has not changed and 20% the bandwidth has decreased by 30%.
-                if random.uniform(a=0.0, b=1.0) < 0.8:
-                    communicationTime = sizeOfDataTransferred / self.bandwidth
-                    effectiveBandwidth = self.bandwidth
-                else:
-                    communicationTime = sizeOfDataTransferred / (self.bandwidth * 0.7)
-                    effectiveBandwidth = self.bandwidth * 0.7
-            else:
-                communicationTime = sizeOfDataTransferred / 0.7 * self.bandwidth
+            communicationTime = sizeOfDataTransferred / self.bandwidth
+
+            # if not preTrain:
+            #     effectiveBandwidth = 0
+            #     # 80% the bandwidth has not changed and 20% the bandwidth has decreased by 30%.
+            #     if random.uniform(a=0.0, b=1.0) < 0.8:
+            #         communicationTime = sizeOfDataTransferred / self.bandwidth
+            #         effectiveBandwidth = self.bandwidth
+            #     else:
+            #         communicationTime = sizeOfDataTransferred / (self.bandwidth * 0.7)
+            #         effectiveBandwidth = self.bandwidth * 0.7
+            # else:
+            #     communicationTime = sizeOfDataTransferred / 0.7 * self.bandwidth
 
             return communicationTime + computationTime
         else:

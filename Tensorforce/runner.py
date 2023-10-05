@@ -3,7 +3,7 @@ import numpy as np
 from tensorforce import Environment
 from Tensorforce import utils
 from Tensorforce.enviroments import customEnv
-from Tensorforce.splittingMethods import RandomAgent, NoSplitting, AC, PPO, TensorforceAgent
+from Tensorforce.splittingMethods import RandomAgent, NoSplitting, AC, PPO, TensorforceAgent, TRPO
 from Tensorforce import config as conf
 from pathlib import Path
 
@@ -155,7 +155,7 @@ class Runner:
             x=energyConsumption,
             y=trainingTimeOfEpisode,
             z=sumRewardOfEpisodes,
-            xlabel="Energy",
+            xlabel=f"Energy {self.saveGraphPath}",
             ylabel="Training Time",
             zlabel="reward"
         )
@@ -174,6 +174,9 @@ def createAgent(agentType, fraction, timestepNum, environment, saveSummariesPath
     elif agentType == 'tensorforce':
         return TensorforceAgent.create(fraction=fraction, environment=environment,
                                        timestepNum=timestepNum, saveSummariesPath=saveSummariesPath)
+    elif agentType == 'trpo':
+        return TRPO.create(fraction=fraction, environment=environment,
+                           timestepNum=timestepNum, saveSummariesPath=saveSummariesPath)
     elif agentType == 'random':
         return RandomAgent.RandomAgent(environment=environment)
     elif agentType == 'noSplitting':
@@ -203,21 +206,19 @@ def preTrainEnv(iotDevices, edgeDevices, cloud, actions):
     maxTrainingTime = 0
     offloadingPointsList = []
 
-    iotDeviceCapacity = [iotDevice.capacity for iotDevice in iotDevices]
+    iotDeviceCapacity = [iotdevice.capacity for iotdevice in iotDevices]
     edgeCapacity = [edges.capacity for edges in edgeDevices]
     cloudCapacity = cloud.capacity
 
     for i in range(0, len(actions), 2):
-        op1 = actions[i]
-        op2 = actions[i + 1]
+        op1, op2 = utils.actionToLayer(actions[i:i + 2])
         cloudCapacity -= sum(conf.COMP_WORK_LOAD[op2 + 1:])
         edgeCapacity[iotDevices[int(i / 2)].edgeIndex] -= sum(conf.COMP_WORK_LOAD[op1 + 1:op2 + 1])
         iotDeviceCapacity[int(i / 2)] -= sum(conf.COMP_WORK_LOAD[0:op1 + 1])
 
     for i in range(0, len(actions), 2):
         # Mapping float number to Offloading points
-        op1 = actions[i]
-        op2 = actions[i + 1]
+        op1, op2 = utils.actionToLayer(actions[i:i + 2])
         offloadingPointsList.append(op1)
         offloadingPointsList.append(op2)
 
@@ -229,9 +230,9 @@ def preTrainEnv(iotDevices, edgeDevices, cloud, actions):
         if iotDeviceCapacity[int(i / 2)] < 0:
             iotTrainingTime += abs(iotDeviceCapacity[int(i / 2)])
         if edgeCapacity[iotDevices[int(i / 2)].edgeIndex] < 0 and (actions[i] != actions[i + 1]):
-            edgeTrainingTime += 10 * abs(edgeCapacity[iotDevices[int(i / 2)].edgeIndex])
+            edgeTrainingTime += 50 * abs(edgeCapacity[iotDevices[int(i / 2)].edgeIndex])
         if cloudCapacity < 0 and actions[i + 1] < conf.LAYER_NUM - 1:
-            cloudTrainingTime += 30 * abs(cloudCapacity)
+            cloudTrainingTime += 50 * abs(cloudCapacity)
 
         totalTrainingTime = iotTrainingTime + edgeTrainingTime + cloudTrainingTime
         if totalTrainingTime > maxTrainingTime:
