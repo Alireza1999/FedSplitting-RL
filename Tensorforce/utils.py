@@ -14,14 +14,13 @@ def createDeviceFromCSV(csvFilePath: str, deviceType: str = 'cloud') -> list[Dev
     with open(csvFilePath, 'r') as device:
         csvreader = csv.reader(device)
         for row in csvreader:
-            if row[0] == 'CPU Core':
+            if row[0] == 'FLOPS':
                 continue
             if deviceType == 'iotDevice':
-                device = Device(deviceType=deviceType, CPU=int(row[0]), bandwidth=float(row[1]), edgeIndex=int(row[2]),
-                                capacity=int(row[3]))
+                device = Device(deviceType=deviceType, FLOPS=int(row[0]), bandwidth=float(row[1]),
+                                edgeIndex=int(row[2]))
             else:
-                device = Device(deviceType=deviceType, CPU=int(row[0]), bandwidth=float(row[1]), capacity=int(row[2]))
-
+                device = Device(deviceType=deviceType, FLOPS=int(row[0]), bandwidth=float(row[1]))
             devices.append(device)
     return devices
 
@@ -126,9 +125,9 @@ def tanhActivation(x: float) -> float:
     return np.tanh(x)
 
 
-def normalizeReward(maxAmount, minAmount, x):
-    P = [maxAmount, 0]
-    Q = [minAmount, 1]
+def normalizeReward(maxAmount, minAmount, x, minNormalized, maxNormalized):
+    P = [maxAmount, minNormalized]
+    Q = [minAmount, maxNormalized]
     lineGradient = (P[1] - Q[1]) / (P[0] - Q[0])
     y = lineGradient * (x - Q[0]) + Q[1]
     return y

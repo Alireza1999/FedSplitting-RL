@@ -1,3 +1,3 @@
-COMP_WORK_LOAD = [20, 15, 30, 10, 25, 30]  # Computation workload for each layer
+COMP_WORK_LOAD = [75, 120, 300, 110, 250, 80]  # Computation workload for each layer (FLOP)
 LAYER_NUM = len(COMP_WORK_LOAD)  # Number of model Layer
-SIZE_OF_PARAM = [10, 8.5, 25, 12, 6]  # Size of parameter send from each layer to next layer (MB)
+SIZE_OF_PARAM = [100, 85, 250, 120, 60]  # Size of parameter send from each layer to next layer (MB)

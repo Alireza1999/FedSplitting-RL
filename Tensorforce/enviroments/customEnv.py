@@ -1,5 +1,4 @@
 import logging
-import random
 
 import numpy as np
 from tensorforce import Environment
@@ -24,16 +23,23 @@ class CustomEnvironment(Environment):
         self.edgeDevices: list[Device] = edgeDevices
         self.cloud: Device = cloud
 
-        self.minEnergy = rewardTuningParams[0]
-        self.maxEnergy = rewardTuningParams[1]
-        self.minTrainingTime = rewardTuningParams[2]
-        self.maxTrainingTime = rewardTuningParams[3]
+        self.maxEnergy = rewardTuningParams[0]
+        self.minEnergy = rewardTuningParams[1]
+        self.ClassicFLTrainingTime = rewardTuningParams[2]
+        # self.minTrainingTime = rewardTuningParams[2]
+        # self.maxTrainingTime = rewardTuningParams[3]
 
         self.fraction = fraction
 
     def states(self):
-        # State = [AvgEnergy, TrainingTime, edge capacity, cloud capacity, prevAction ]
-        return dict(type="float", shape=(1 + 1 + self.edgeDeviceNum + 1 + self.iotDeviceNum * 2))
+
+        # State = [AvgEnergy, TrainingTime, number of connected device to each edge, number of devices connected to
+        # cloud , prevAction ]
+        # return dict(type="float", shape=(1 + 1 + self.edgeDeviceNum + 1 + self.iotDeviceNum * 2))
+
+        # State = [AvgEnergy ,maxTrainingTime , TrainingTime of Each device,  number of connected device to each edge,
+        # number of devices connected to cloud , prevAction]
+        return dict(type="float", shape=(1 + 1 + self.iotDeviceNum + self.edgeDeviceNum + 1 + self.iotDeviceNum * 2))
 
     def actions(self):
         return dict(type="float", shape=(self.iotDeviceNum * 2,), min_value=0.0, max_value=1.0)
@@ -46,6 +52,7 @@ class CustomEnvironment(Environment):
 
     def reset(self):
         randActions = np.random.uniform(low=0.0, high=1.0, size=(self.iotDeviceNum * 2))
+        # randActions = [config.LAYER_NUM-1] * 2 * self.iotDeviceNum
         reward, newState = self.rewardFun(randActions)
         randEnergy = newState[0]
         randTrainingTime = newState[1]
@@ -57,40 +64,50 @@ class CustomEnvironment(Environment):
         state.extend(randActions)
         return state
 
-    def rewardFun(self, actions):
+    def rewardFun(self, action):
+        allTrainingTimes = []
+        edgesConnectedDeviceNum = [0] * self.edgeDeviceNum
+
+        for i in range(0, len(action), 2):
+            self.edgeDevices[self.iotDevices[int(i / 2)].edgeIndex].connectedDevice = 0
+            self.cloud.connectedDevice = 0
+
         totalEnergyConsumption = 0
         maxTrainingTime = 0
         offloadingPointsList = []
 
-        iotDeviceCapacity = [iotdevice.capacity for iotdevice in self.iotDevices]
-        edgeCapacity = [edges.capacity for edges in self.edgeDevices]
-        cloudCapacity = self.cloud.capacity
+        iotRemainingFLOP = [iot.FLOPS for iot in self.iotDevices]
+        edgeRemainingFLOP = [edge.FLOPS for edge in self.edgeDevices]
+        cloudRemainingFLOP = self.cloud.FLOPS
 
-        for i in range(0, len(actions), 2):
-            op1, op2 = utils.actionToLayer(actions[i:i + 2])
-            cloudCapacity -= sum(config.COMP_WORK_LOAD[op2 + 1:])
-            edgeCapacity[self.iotDevices[int(i / 2)].edgeIndex] -= sum(config.COMP_WORK_LOAD[op1 + 1:op2 + 1])
-            iotDeviceCapacity[int(i / 2)] -= sum(config.COMP_WORK_LOAD[0:op1 + 1])
+        for i in range(0, len(action), 2):
+            op1, op2 = utils.actionToLayer(action[i:i + 2])
+            cloudRemainingFLOP -= sum(config.COMP_WORK_LOAD[op2 + 1:])
+            edgeRemainingFLOP[self.iotDevices[int(i / 2)].edgeIndex] -= sum(config.COMP_WORK_LOAD[op1 + 1:op2 + 1])
+            iotRemainingFLOP[int(i / 2)] -= sum(config.COMP_WORK_LOAD[0:op1 + 1])
 
-        for i in range(0, len(actions), 2):
+            if sum(config.COMP_WORK_LOAD[op1 + 1:op2 + 1]):
+                self.edgeDevices[self.iotDevices[int(i / 2)].edgeIndex].connectedDevice += 1
+                edgesConnectedDeviceNum[self.iotDevices[int(i / 2)].edgeIndex] += 1
+            if sum(config.COMP_WORK_LOAD[op2 + 1:]) != 0:
+                self.cloud.connectedDevice += 1
+
+        for i in range(0, len(action), 2):
             # Mapping float number to Offloading points
-            op1, op2 = utils.actionToLayer(actions[i:i + 2])
+            op1, op2 = utils.actionToLayer(action[i:i + 2])
             offloadingPointsList.append(op1)
             offloadingPointsList.append(op2)
 
             # computing training time of this action
-            iotTrainingTime = self.iotDevices[int(i / 2)].trainingTime([op1, op2])
-            edgeTrainingTime = self.edgeDevices[self.iotDevices[int(i / 2)].edgeIndex].trainingTime([op1, op2])
-            cloudTrainingTime = self.cloud.trainingTime([op1, op2])
-
-            if iotDeviceCapacity[int(i / 2)] < 0:
-                iotTrainingTime += abs(iotDeviceCapacity[int(i / 2)])
-            if edgeCapacity[self.iotDevices[int(i / 2)].edgeIndex] < 0 and (actions[i] != actions[i + 1]):
-                edgeTrainingTime += 50 * abs(edgeCapacity[self.iotDevices[int(i / 2)].edgeIndex])
-            if cloudCapacity < 0 and actions[i + 1] < config.LAYER_NUM - 1:
-                cloudTrainingTime += 50 * abs(cloudCapacity)
+            iotTrainingTime = self.iotDevices[int(i / 2)].trainingTime([op1, op2],
+                                                                       remainingFlops=iotRemainingFLOP[int(i / 2)])
+            edgeTrainingTime = self.edgeDevices[self.iotDevices[int(i / 2)].edgeIndex] \
+                .trainingTime([op1, op2],
+                              remainingFlops=edgeRemainingFLOP[self.iotDevices[int(i / 2)].edgeIndex])
+            cloudTrainingTime = self.cloud.trainingTime([op1, op2], remainingFlops=cloudRemainingFLOP)
 
             totalTrainingTime = iotTrainingTime + edgeTrainingTime + cloudTrainingTime
+            allTrainingTimes.append(totalTrainingTime)
             if totalTrainingTime > maxTrainingTime:
                 maxTrainingTime = totalTrainingTime
 
@@ -100,14 +117,20 @@ class CustomEnvironment(Environment):
 
         averageEnergyConsumption = totalEnergyConsumption / self.iotDeviceNum
 
+        rewardOfTrainingTime = maxTrainingTime
+        rewardOfTrainingTime -= 400
+        rewardOfTrainingTime /= 100
+        rewardOfTrainingTime *= -1
+
+        rewardOfTrainingTime = min(max(rewardOfTrainingTime, -1), 1)
+
         rewardOfEnergy = utils.normalizeReward(maxAmount=self.maxEnergy, minAmount=self.minEnergy,
-                                               x=averageEnergyConsumption)
-        rewardOfTrainingTime = utils.normalizeReward(maxAmount=self.maxTrainingTime, minAmount=self.minTrainingTime,
-                                                     x=maxTrainingTime)
+                                               x=averageEnergyConsumption, minNormalized=-1, maxNormalized=1)
+        # rewardOfTrainingTime = utils.normalizeReward(maxAmount=self.maxTrainingTime, minAmount=self.minTrainingTime,
+        #                                             x=maxTrainingTime)
 
         if self.fraction <= 1:
             reward = (self.fraction * rewardOfEnergy) + ((1 - self.fraction) * rewardOfTrainingTime)
-
         else:
             raise Exception("Fraction must be less than 1")
 
@@ -118,14 +141,23 @@ class CustomEnvironment(Environment):
         logger.info(f"Reward of this action : {reward} \n")
         logger.info(f"Reward of energy : {self.fraction * rewardOfEnergy} \n")
         logger.info(f"Reward of training time : {(1 - self.fraction) * rewardOfTrainingTime} \n")
-        logger.info(f"IOTs Capacities : {iotDeviceCapacity} \n")
-        logger.info(f"Edges Capacities : {edgeCapacity} \n")
-        logger.info(f"Cloud Capacities : {cloudCapacity} \n")
+        logger.info(f"IOTs Capacities : {iotRemainingFLOP} \n")
+        logger.info(f"Edges Capacities : {edgeRemainingFLOP} \n")
+        logger.info(f"Cloud Capacities : {cloudRemainingFLOP} \n")
 
+        # newState = [1 - utils.normalizeReward(self.maxEnergy, self.minEnergy, averageEnergyConsumption),
+        #             1 - utils.normalizeReward(800, 49, maxTrainingTime)]
+        #
+        # allTrainingTimes = [1 - utils.normalizeReward(650, 49, trainingTime) for trainingTime in allTrainingTimes]
         newState = [averageEnergyConsumption, maxTrainingTime]
-        newState.extend(edgeCapacity)
-        newState.append(cloudCapacity)
-        newState.extend(actions)
+        newState.extend(allTrainingTimes)
+        newState.extend(edgesConnectedDeviceNum)
+        newState.append(self.cloud.connectedDevice)
+        # newState.extend(edgeRemainingFLOP)
+        # newState.append(cloudRemainingFLOP)
+        newState.extend(action)
+        logger.info(f"New State : {newState} \n")
+
         return reward, newState
 
     def execute(self, actions: list):

@@ -1,2 +1,2 @@
-CPU Core,Bandwidth(MB/s),Capacity (Workload)
-10,10,20
+FLOPS,Bandwidth(MB/s)
+600,100

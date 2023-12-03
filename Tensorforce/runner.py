@@ -1,16 +1,20 @@
 import logging
+from pathlib import Path
+
 import numpy as np
 from tensorforce import Environment
+
+from System.Device import Device
+from Tensorforce import config as conf
 from Tensorforce import utils
 from Tensorforce.enviroments import customEnv
 from Tensorforce.splittingMethods import RandomAgent, NoSplitting, AC, PPO, TensorforceAgent, TRPO
-from Tensorforce import config as conf
-from pathlib import Path
 
 
 class Runner:
 
-    def __init__(self, agentType='ppo', episodeNum=501, timestepNum=200, fraction=0.8, summaries=False, log=False):
+    def __init__(self, agentType='tensorforce', episodeNum=501, timestepNum=200, fraction=0.8, summaries=False,
+                 log=False):
         self.agentType = agentType
         self.episodeNum = episodeNum
         self.timestepNum = timestepNum
@@ -27,20 +31,26 @@ class Runner:
         edgeDevices = utils.createDeviceFromCSV(csvFilePath="../System/edgesSmallScale.csv")
         cloud = utils.createDeviceFromCSV(csvFilePath="../System/cloud.csv")[0]
 
-        rewardTuningParams = preTrain(iotDevices=iotDevices, edgeDevices=edgeDevices, cloud=cloud)
+        maxEnergy, minEnergy = minMaxAvgEnergy(iotDevices, edgeDevices, cloud)
+        FLTrainingTime = ClassicFLTrainingTime(iotDevices, edgeDevices, cloud)
+
+        # rewardTuningParams = preTrain(iotDevices=iotDevices, edgeDevices=edgeDevices, cloud=cloud)
+
+        rewardTuningParams = [maxEnergy, minEnergy, FLTrainingTime]
 
         print(f"------------------------------------------------")
-        print(f"MIN Energy : \n{rewardTuningParams[0]}")
+        print(f"Max Energy : \n{rewardTuningParams[0]}")
+        print(f"Min Energy : \n{rewardTuningParams[1]}")
+        print(f"------------------------------------------------")
+        print(f"Classic FL Training Time : \n{rewardTuningParams[2]}")
+        print(f"------------------------------------------------")
 
-        print(f"------------------------------------------------")
-        print(f"MAX Energy : {rewardTuningParams[1]}")
-
-        print(f"------------------------------------------------")
-        print(f"MIN TrainingTime : {rewardTuningParams[2]}")
-
-        print(f"------------------------------------------------")
-        print(f"MAX TrainingTime : {rewardTuningParams[3]}")
-        print(f"------------------------------------------------")
+        # print(f"------------------------------------------------")
+        # print(f"MIN TrainingTime : {rewardTuningParams[2]}")
+        #
+        # print(f"------------------------------------------------")
+        # print(f"MAX TrainingTime : {rewardTuningParams[3]}")
+        # print(f"------------------------------------------------")
 
         env = createEnv(rewardTuningParams=rewardTuningParams,
                         iotDevices=iotDevices, edgeDevices=edgeDevices, cloud=cloud,
@@ -94,7 +104,7 @@ class Runner:
                 AvgEnergyOfIotDevices.append(states[0])
 
             # sumRewardOfEpisodes = np.append(sumRewardOfEpisodes, episode_reward)
-            sumRewardOfEpisodes.append(sum(episode_reward))
+            sumRewardOfEpisodes.append(sum(episode_reward) / self.timestepNum)
             energyConsumption.append(sum(episode_energy) / self.timestepNum)
             trainingTimeOfEpisode.append(sum(episode_trainingTime) / self.timestepNum)
             trainingTimeOfAllTimesteps = np.append(trainingTimeOfAllTimesteps, episode_trainingTime)
@@ -160,6 +170,34 @@ class Runner:
             zlabel="reward"
         )
 
+        if self.agentType != "random":
+            # Evaluate for 100 episodes
+            rewardEvalEpisode = []
+            sum_rewards = 0.0
+            x = []
+
+            for i in range(100):
+                rewardEval = []
+                states = env.reset()
+                internals = agent.initial_internals()
+                terminal = False
+                while not terminal:
+                    actions, internals = agent.act(states=states, internals=internals, evaluation=True)
+                    states, terminal, reward = env.execute(actions=actions)
+                    rewardEval.append(reward)
+                    sum_rewards += reward
+                rewardEvalEpisode.append(sum(rewardEval) / self.timestepNum)
+                x.append(i)
+            utils.draw_graph(title="Reward vs Episode Eval",
+                             xlabel="Episode",
+                             ylabel="Reward",
+                             figSizeX=10,
+                             figSizeY=5,
+                             x=x,
+                             y=rewardEvalEpisode,
+                             savePath=self.saveGraphPath,
+                             pictureName=f"Reward_episode_evaluation")
+            print('Mean episode reward:', sum_rewards / 100)
         agent.close()
         env.close()
 
@@ -201,38 +239,48 @@ def createLog(fileName):
     return logger
 
 
-def preTrainEnv(iotDevices, edgeDevices, cloud, actions):
+def preTrainEnv(iotDevices: list[Device], edgeDevices: list[Device], cloud: Device, action):
+    edgesConnectedDeviceNum = [0] * len(edgeDevices)
+
+    for i in range(0, len(action), 2):
+        edgeDevices[iotDevices[int(i / 2)].edgeIndex].connectedDevice = 0
+        cloud.connectedDevice = 0
+
     totalEnergyConsumption = 0
     maxTrainingTime = 0
     offloadingPointsList = []
 
-    iotDeviceCapacity = [iotdevice.capacity for iotdevice in iotDevices]
-    edgeCapacity = [edges.capacity for edges in edgeDevices]
-    cloudCapacity = cloud.capacity
+    iotRemainingFLOP = [iot.FLOPS for iot in iotDevices]
+    edgeRemainingFLOP = [edge.FLOPS for edge in edgeDevices]
+    cloudRemainingFLOP = cloud.FLOPS
 
-    for i in range(0, len(actions), 2):
-        op1, op2 = utils.actionToLayer(actions[i:i + 2])
-        cloudCapacity -= sum(conf.COMP_WORK_LOAD[op2 + 1:])
-        edgeCapacity[iotDevices[int(i / 2)].edgeIndex] -= sum(conf.COMP_WORK_LOAD[op1 + 1:op2 + 1])
-        iotDeviceCapacity[int(i / 2)] -= sum(conf.COMP_WORK_LOAD[0:op1 + 1])
+    for i in range(0, len(action), 2):
+        op1, op2 = utils.actionToLayer(action[i:i + 2])
+        cloudRemainingFLOP -= sum(conf.COMP_WORK_LOAD[op2 + 1:])
+        edgeRemainingFLOP[iotDevices[int(i / 2)].edgeIndex] -= sum(conf.COMP_WORK_LOAD[op1 + 1:op2 + 1])
+        iotRemainingFLOP[int(i / 2)] -= sum(conf.COMP_WORK_LOAD[0:op1 + 1])
 
-    for i in range(0, len(actions), 2):
+        if sum(conf.COMP_WORK_LOAD[op1 + 1:op2 + 1]):
+            edgeDevices[iotDevices[int(i / 2)].edgeIndex].connectedDevice += 1
+            edgesConnectedDeviceNum[iotDevices[int(i / 2)].edgeIndex] += 1
+        if sum(conf.COMP_WORK_LOAD[op2 + 1:]) != 0:
+            cloud.connectedDevice += 1
+
+    for i in range(0, len(action), 2):
         # Mapping float number to Offloading points
-        op1, op2 = utils.actionToLayer(actions[i:i + 2])
+        op1, op2 = utils.actionToLayer(action[i:i + 2])
         offloadingPointsList.append(op1)
         offloadingPointsList.append(op2)
 
         # computing training time of this action
-        iotTrainingTime = iotDevices[int(i / 2)].trainingTime([op1, op2], preTrain=True)
-        edgeTrainingTime = edgeDevices[iotDevices[int(i / 2)].edgeIndex].trainingTime([op1, op2], preTrain=True)
-        cloudTrainingTime = cloud.trainingTime([op1, op2], preTrain=True)
-
-        if iotDeviceCapacity[int(i / 2)] < 0:
-            iotTrainingTime += abs(iotDeviceCapacity[int(i / 2)])
-        if edgeCapacity[iotDevices[int(i / 2)].edgeIndex] < 0 and (actions[i] != actions[i + 1]):
-            edgeTrainingTime += 50 * abs(edgeCapacity[iotDevices[int(i / 2)].edgeIndex])
-        if cloudCapacity < 0 and actions[i + 1] < conf.LAYER_NUM - 1:
-            cloudTrainingTime += 50 * abs(cloudCapacity)
+        iotTrainingTime = iotDevices[int(i / 2)].trainingTime(splitPoints=[op1, op2],
+                                                              remainingFlops=iotRemainingFLOP[int(i / 2)],
+                                                              preTrain=True)
+        edgeTrainingTime = edgeDevices[iotDevices[int(i / 2)].edgeIndex] \
+            .trainingTime(splitPoints=[op1, op2],
+                          remainingFlops=edgeRemainingFLOP[iotDevices[int(i / 2)].edgeIndex],
+                          preTrain=True)
+        cloudTrainingTime = cloud.trainingTime([op1, op2], remainingFlops=cloudRemainingFLOP, preTrain=True)
 
         totalTrainingTime = iotTrainingTime + edgeTrainingTime + cloudTrainingTime
         if totalTrainingTime > maxTrainingTime:
@@ -241,7 +289,6 @@ def preTrainEnv(iotDevices, edgeDevices, cloud, actions):
         # computing energy consumption of iot devices
         iotEnergy = iotDevices[int(i / 2)].energyConsumption([op1, op2])
         totalEnergyConsumption += iotEnergy
-
     averageEnergyConsumption = totalEnergyConsumption / len(iotDevices)
 
     return averageEnergyConsumption, maxTrainingTime
@@ -263,7 +310,7 @@ def preTrain(iotDevices, edgeDevices, cloud):
             splittingArray.append(int(char))
 
         avgEnergy, trainingTime = preTrainEnv(iotDevices=iotDevices, edgeDevices=edgeDevices, cloud=cloud,
-                                              actions=splittingArray)
+                                              action=splittingArray)
         if avgEnergy < min_Energy:
             min_Energy = avgEnergy
             rewardTuningParams[0] = min_Energy
@@ -286,3 +333,78 @@ def preTrain(iotDevices, edgeDevices, cloud):
             max_trainingtime_splitting = splittingArray
             max_trainingTime_energy = avgEnergy
     return rewardTuningParams
+
+
+def minMaxAvgEnergy(iotDevices, edgeDevices, cloud):
+    splittingLayer = utils.allPossibleSplitting(modelLen=conf.LAYER_NUM - 1, deviceNumber=1)
+    maxAvgEnergyOfOneDevice = 0
+    minAvgEnergyOfOneDevice = 1.0e7
+    maxEnergySplitting = []
+    minEnergySplitting = []
+
+    for splitting in splittingLayer:
+        splittingArray = list()
+        for char in splitting:
+            splittingArray.append(int(char))
+
+        avgEnergyOfOneDevice, trainingTimeOfOneDevice = preTrainEnv(iotDevices=iotDevices, edgeDevices=edgeDevices,
+                                                                    cloud=cloud,
+                                                                    action=splittingArray)
+        if avgEnergyOfOneDevice > maxAvgEnergyOfOneDevice:
+            maxAvgEnergyOfOneDevice = avgEnergyOfOneDevice
+            maxEnergySplitting = splittingArray * len(iotDevices)
+        if avgEnergyOfOneDevice < minAvgEnergyOfOneDevice:
+            minAvgEnergyOfOneDevice = avgEnergyOfOneDevice
+            minEnergySplitting = splittingArray * len(iotDevices)
+
+    maxAvgEnergy, trainingTime = preTrainEnv(iotDevices=iotDevices, edgeDevices=edgeDevices, cloud=cloud,
+                                             action=maxEnergySplitting)
+    minAvgEnergy, trainingTime = preTrainEnv(iotDevices=iotDevices, edgeDevices=edgeDevices, cloud=cloud,
+                                             action=minEnergySplitting)
+    return maxAvgEnergy, minAvgEnergy
+
+
+def ClassicFLTrainingTime(iotDevices, edgeDevices, cloud):
+    maxTrainingTime = 0
+
+    action = [conf.LAYER_NUM - 1, conf.LAYER_NUM - 1] * len(iotDevices)
+
+    for i in range(0, len(action), 2):
+        edgeDevices[iotDevices[int(i / 2)].edgeIndex].connectedDevice = 0
+        cloud.connectedDevice = 0
+
+    iotRemainingFLOP = [iot.FLOPS for iot in iotDevices]
+    edgeRemainingFLOP = [edge.FLOPS for edge in edgeDevices]
+    cloudRemainingFLOP = cloud.FLOPS
+
+    for i in range(0, len(action), 2):
+        op1 = action[i]
+        op2 = action[i + 1]
+        cloudRemainingFLOP -= sum(conf.COMP_WORK_LOAD[op2 + 1:])
+        edgeRemainingFLOP[iotDevices[int(i / 2)].edgeIndex] -= sum(conf.COMP_WORK_LOAD[op1 + 1:op2 + 1])
+        iotRemainingFLOP[int(i / 2)] -= sum(conf.COMP_WORK_LOAD[0:op1 + 1])
+
+        if sum(conf.COMP_WORK_LOAD[op1 + 1:op2 + 1]):
+            edgeDevices[iotDevices[int(i / 2)].edgeIndex].connectedDevice += 1
+        if sum(conf.COMP_WORK_LOAD[op2 + 1:]) != 0:
+            cloud.connectedDevice += 1
+
+    for i in range(0, len(action), 2):
+        # Mapping float number to Offloading points
+        op1 = action[i]
+        op2 = action[i + 1]
+
+        # computing training time of this action
+        iotTrainingTime = iotDevices[int(i / 2)].trainingTime(splitPoints=[op1, op2],
+                                                              remainingFlops=iotRemainingFLOP[int(i / 2)],
+                                                              preTrain=True)
+        edgeTrainingTime = edgeDevices[iotDevices[int(i / 2)].edgeIndex] \
+            .trainingTime(splitPoints=[op1, op2],
+                          remainingFlops=edgeRemainingFLOP[iotDevices[int(i / 2)].edgeIndex],
+                          preTrain=True)
+        cloudTrainingTime = cloud.trainingTime([op1, op2], remainingFlops=cloudRemainingFLOP, preTrain=True)
+
+        totalTrainingTime = iotTrainingTime + edgeTrainingTime + cloudTrainingTime
+        if totalTrainingTime > maxTrainingTime:
+            maxTrainingTime = totalTrainingTime
+    return maxTrainingTime
