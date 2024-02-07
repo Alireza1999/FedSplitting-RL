@@ -30,18 +30,18 @@ def create(fraction, environment, timestepNum, saveSummariesPath):
             batch_size=5,
         ),
 
-        policy=dict(
-            type='parametrized_distributions',
-            network='auto',
-            distributions=dict(
-                float=dict(type='beta'),
-                bounded_action=dict(type='beta')
-            ),
-            # temperature=dict(
-            #     type='decaying', decay='exponential', unit='timesteps',
-            #     decay_steps=5, initial_value=0.01, decay_rate=0.5
-            # ),
-        ),
+        # policy=dict(
+        #     type='parametrized_distributions',
+        #     network='auto',
+        #     distributions=dict(
+        #         float=dict(type='beta'),
+        #         bounded_action=dict(type='beta')
+        #     ),
+        #     temperature=dict(
+        #         type='decaying', decay='exponential', unit='timesteps',
+        #         decay_steps=5, initial_value=0.01, decay_rate=0.5
+        #     ),
+        #  ),
 
         objective='policy_gradient',
 
@@ -62,7 +62,7 @@ def create(fraction, environment, timestepNum, saveSummariesPath):
 
         # Config
         config=dict(name='agent',
-                    device="GPU",
+                    device="CPU",
                     parallel_interactions=1,
                     seed=None,
                     execution=None,

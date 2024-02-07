@@ -88,7 +88,7 @@ def actionToLayer(splitDecision: list[float]) -> tuple[int, int]:
     totalWorkLoad = sum(config.COMP_WORK_LOAD[1:])
 
     op1: int
-    op2: int  # Offloading points op1, op2
+    op2: int = 0  # Offloading points op1, op2
 
     op1_workload = splitDecision[0] * totalWorkLoad
     for i in range(0, config.LAYER_NUM):
@@ -98,18 +98,20 @@ def actionToLayer(splitDecision: list[float]) -> tuple[int, int]:
             op1 = i
             break
 
-    remindedWorkLoad = sum(config.COMP_WORK_LOAD[op1 + 1:]) * splitDecision[1]
+    if splitDecision[1] != -1:
+        remindedWorkLoad = sum(config.COMP_WORK_LOAD[op1 + 1:]) * splitDecision[1]
 
-    for i in range(op1, len(config.COMP_WORK_LOAD)):
-        difference = abs(sum(config.COMP_WORK_LOAD[op1 + 1:i + 1]) - remindedWorkLoad)
-        temp2 = abs(sum(config.COMP_WORK_LOAD[op1 + 1:i + 2]) - remindedWorkLoad)
-        if temp2 >= difference:
-            op2 = i
-            break
-    if op2 == 0:
-        op2 = op2 + 1
-    if op1 == config.LAYER_NUM - 1:
-        op2 = config.LAYER_NUM - 1
+        for i in range(op1, len(config.COMP_WORK_LOAD)):
+            difference = abs(sum(config.COMP_WORK_LOAD[op1 + 1:i + 1]) - remindedWorkLoad)
+            temp2 = abs(sum(config.COMP_WORK_LOAD[op1 + 1:i + 2]) - remindedWorkLoad)
+            if temp2 >= difference:
+                op2 = i
+                break
+        if op2 == 0:
+            op2 = op2 + 1
+        if op1 == config.LAYER_NUM - 1:
+            op2 = config.LAYER_NUM - 1
+
     return op1, op2
 
 
@@ -130,6 +132,11 @@ def normalizeReward(maxAmount, minAmount, x, minNormalized, maxNormalized):
     Q = [minAmount, maxNormalized]
     lineGradient = (P[1] - Q[1]) / (P[0] - Q[0])
     y = lineGradient * (x - Q[0]) + Q[1]
+    return y
+
+
+def normalizeReward_tan(x, turning_point):
+    y = max(min(-pow(x - turning_point, 3) / pow(turning_point, 3), 1), -1)
     return y
 
 

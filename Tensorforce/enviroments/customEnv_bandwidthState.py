@@ -34,13 +34,8 @@ class CustomEnvironment(Environment):
 
     def states(self):
 
-        # State = [AvgEnergy, TrainingTime, number of connected device to each edge, number of devices connected to
-        # cloud , prevAction ]
-        # return dict(type="float", shape=(1 + 1 + self.edgeDeviceNum + 1 + self.iotDeviceNum * 2))
-
-        # State = [AvgEnergy ,maxTrainingTime , TrainingTime of Each device,  number of connected device to each edge,
-        # number of devices connected to cloud , prevAction]
-        return dict(type="float", shape=(1 + 1 + self.iotDeviceNum + self.edgeDeviceNum + 1 + self.iotDeviceNum * 2))
+        # State = [Bandwidth of each client, bandwidth of each edge]
+        return dict(type="float", shape=(self.iotDeviceNum + self.edgeDeviceNum))
 
     def actions(self):
         return dict(type="float", shape=(self.iotDeviceNum * 2,), min_value=0.0, max_value=1.0)
@@ -52,6 +47,9 @@ class CustomEnvironment(Environment):
         super().close()
 
     def reset(self):
+        bandwidths = []
+        for i in range():
+
         randActions = np.random.uniform(low=0.0, high=1.0, size=(self.iotDeviceNum * 2))
         # randActions = [config.LAYER_NUM-1] * 2 * self.iotDeviceNum
         reward, newState = self.rewardFun(randActions)

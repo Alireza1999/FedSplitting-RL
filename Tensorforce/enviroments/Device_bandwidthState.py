@@ -1,7 +1,4 @@
 import logging
-import random
-
-import numpy as np
 
 import Tensorforce.config as config
 
@@ -17,21 +14,8 @@ class Device:
         self.bandwidth = float(bandwidth)
         self.deviceType = str(deviceType)
         self.connectedDevice = int(connectedDevice)
-        self.effectiveBandwidth = self.bandwidth
 
-    def trainingTime(self, splitPoints: list, remainingFlops: int, numOfBatch: int = 1,
-                     preTrain: bool = False) -> float:
-        self.effectiveBandwidth = self.bandwidth
-        if not preTrain:
-            # 80% the bandwidth has not changed and 20% the bandwidth has decreased by 30%.
-            if random.uniform(a=0.0, b=1.0) > 0.8:
-                effectiveBandwidth = np.random.uniform(low=self.bandwidth * 0.9, high=self.bandwidth)
-            else:
-                effectiveBandwidth = self.bandwidth
-        else:
-            effectiveBandwidth = self.bandwidth * 0.9
-
-        self.effectiveBandwidth = effectiveBandwidth
+    def trainingTime(self, bandwidth: float, splitPoints: list, remainingFlops: int, numOfBatch: int = 1) -> float:
 
         if splitPoints[0] < config.LAYER_NUM and config.LAYER_NUM > splitPoints[1] >= splitPoints[0]:
             computationTime = 0
@@ -48,7 +32,7 @@ class Device:
                         sizeOfDataTransferred = config.SIZE_OF_PARAM[splitPoints[0]]
                     else:
                         sizeOfDataTransferred = 0
-                    communicationTime += sizeOfDataTransferred / effectiveBandwidth
+                    communicationTime += sizeOfDataTransferred / bandwidth
 
                 elif self.deviceType == 'edge':
                     compWorkLoad = sum(config.COMP_WORK_LOAD[splitPoints[0] + 1:splitPoints[1] + 1])
@@ -61,7 +45,7 @@ class Device:
                         sizeOfDataTransferred = config.SIZE_OF_PARAM[splitPoints[1]]
                     else:
                         sizeOfDataTransferred = 0
-                    communicationTime += sizeOfDataTransferred / effectiveBandwidth
+                    communicationTime += sizeOfDataTransferred / bandwidth
                 else:
                     compWorkLoad = sum(config.COMP_WORK_LOAD[splitPoints[1] + 1:])
                     if self.connectedDevice != 0:
