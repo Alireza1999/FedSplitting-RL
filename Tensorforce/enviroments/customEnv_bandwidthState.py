@@ -5,7 +5,7 @@ from tensorforce import Environment
 
 import Tensorforce.config as config
 from Tensorforce import utils
-from Tensorforce.enviroments.Device_bandwidthState import Device
+from entities.Device_bandwidthState import Device
 
 logger = logging.getLogger()
 

@@ -4,7 +4,7 @@ import numpy as np
 from tensorforce import Environment
 
 import Tensorforce.config as config
-from System.Device import Device
+from entities.Device import Device
 from Tensorforce import utils
 
 logger = logging.getLogger()

@@ -36,10 +36,10 @@ class Runner:
         self.saveSummariesPath = f"{Path(__file__).parent}"
 
     def run(self):
-        iotDevices = utils.createDeviceFromCSV(csvFilePath="../System/iotDevices.csv",
+        iotDevices = utils.createDeviceFromCSV(csvFilePath="../envs_stats/iotDevices.csv",
                                                deviceType='iotDevice')
-        edgeDevices = utils.createDeviceFromCSV(csvFilePath="../System/edges.csv")
-        cloud = utils.createDeviceFromCSV(csvFilePath="../System/cloud.csv")[0]
+        edgeDevices = utils.createDeviceFromCSV(csvFilePath="../envs_stats/edges.csv")
+        cloud = utils.createDeviceFromCSV(csvFilePath="../envs_stats/cloud.csv")[0]
 
         if self.envType == "fedAdapt":
             allTrainingTime = utils.ClassicFLTrainingTimeWithoutEdge(iotDevices, cloud)
@@ -289,10 +289,10 @@ class Runner:
 
 
 def FedAdaptRunner(timestepNum, episodeNum, rewardTuningParams):
-    iotDevices = utils.createDeviceFromCSV(csvFilePath="../System/iotDevicesScalabilityTest50Device.csv",
+    iotDevices = utils.createDeviceFromCSV(csvFilePath="../envs_stats/iotDevicesScalabilityTest50Device.csv",
                                            deviceType='iotDevice')
-    edgeDevices = utils.createDeviceFromCSV(csvFilePath="../System/edgesScalabilityTest50Device.csv")
-    cloud = utils.createDeviceFromCSV(csvFilePath="../System/cloud50Device.csv")[0]
+    edgeDevices = utils.createDeviceFromCSV(csvFilePath="../envs_stats/edgesScalabilityTest50Device.csv")
+    cloud = utils.createDeviceFromCSV(csvFilePath="../envs_stats/cloud50Device.csv")[0]
 
     saveGraphPath = f"Graphs/FedAdapt/ScalabilityTest"
 

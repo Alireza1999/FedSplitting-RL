@@ -3,9 +3,8 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-import System.Device as Device
+import entities.Device as Device
 import Tensorforce.config as conf
-import Tensorforce.utils as utils
 
 
 class FirstFit:
@@ -70,10 +69,10 @@ def find_index_with_sum(arr, target_sum):
     return index
 
 
-# iotDevices = utils.createDeviceFromCSV(csvFilePath="../System/iotDevicesSmallScale.csv",
+# iotDevices = utils.createDeviceFromCSV(csvFilePath="../envs_stats/iotDevicesSmallScale.csv",
 #                                        deviceType='iotDevice')
-# edgeDevices = utils.createDeviceFromCSV(csvFilePath="../System/edgesSmallScale.csv")
-# cloud = utils.createDeviceFromCSV(csvFilePath="../System/cloud.csv")[0]
+# edgeDevices = utils.createDeviceFromCSV(csvFilePath="../envs_stats/edgesSmallScale.csv")
+# cloud = utils.createDeviceFromCSV(csvFilePath="../envs_stats/cloud.csv")[0]
 # a = FirstFit(iotDevices=iotDevices, edgeDevices=edgeDevices, cloud=cloud)
 # action = a.act()
 # print(action)

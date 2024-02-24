@@ -2,7 +2,7 @@ import logging
 
 from tensorforce import Environment
 
-from System.Device import Device
+from entities.Device import Device
 from Tensorforce import config as conf
 from Tensorforce import utils
 from Tensorforce.enviroments import customEnv
@@ -24,10 +24,10 @@ class Runner:
         minTT = 1.0e7
         maxTT = 0
 
-        iotDevices = utils.createDeviceFromCSV(csvFilePath="../System/iotDevices.csv",
+        iotDevices = utils.createDeviceFromCSV(csvFilePath="../envs_stats/iotDevices.csv",
                                                deviceType='iotDevice')
-        edgeDevices = utils.createDeviceFromCSV(csvFilePath="../System/edges.csv")
-        cloud = utils.createDeviceFromCSV(csvFilePath="../System/cloud.csv")[0]
+        edgeDevices = utils.createDeviceFromCSV(csvFilePath="../envs_stats/edges.csv")
+        cloud = utils.createDeviceFromCSV(csvFilePath="../envs_stats/cloud.csv")[0]
 
         logger = createLog(fileName=f"AllPossibleSplitting")
 

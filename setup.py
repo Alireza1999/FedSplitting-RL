@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
     name='FedSplitting-RL',
     version='1.0',
-    packages=['System'],
+    packages=['envs_stats'],
     url='',
     license='',
     author='Alireza Soleimani',

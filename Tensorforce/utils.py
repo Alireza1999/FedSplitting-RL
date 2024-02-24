@@ -7,10 +7,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
 
-from System.Device import Device
+from entities.Device import Device
 from Tensorforce import config
 from Tensorforce.enviroments import customEnv_bandwidthState, customEnv, customEnvNoEdge, fedAdaptEnv
-from Tensorforce.enviroments.Device_bandwidthState import Device as Device2
+from entities.Device_bandwidthState import Device as Device2
 from Tensorforce.splittingMethods import FirstFit, PPO, TRPO, RandomAgent, NoSplitting, TensorforceAgent, AC
 
 
