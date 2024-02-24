@@ -8,7 +8,7 @@ from Tensorforce import runner
 arguments = {
     '-a': ['--agent', 'tensorforce',
            '[String] name of the RL agent[ppo, firstFit, ac, trpo, tensorforce, random, noSplitting]'],
-    '-env': ['--env', 'default', '[String] name of the environment [fedAdapt, default, defaultNoEdge]'],
+    '-env': ['--env', 'default', '[String] name of the environment [fedAdapt, default, defaultNoEdge, bandwidthInState]'],
     '-f': ['--fraction', 0.8, '[float] The fraction of energy and training time that is used for training RL'],
     '-e': ['--episode', 501, '[int] Number of episodes'],
     '-t': ['--timestep', 200, '[int] Number of timestep of each episode'],

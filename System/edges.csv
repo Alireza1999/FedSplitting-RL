@@ -1,4 +1,3 @@
-CPU Core,Bandwidth(MB/s),Capacity (layers)
-8,20,5
-10,25,9
-12,30,15
+FLOPS,Bandwidth(MB/s),MaxPower(watt)
+1400000,1.0,21
+1400000,1.5,21

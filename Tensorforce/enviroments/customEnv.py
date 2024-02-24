@@ -23,13 +23,14 @@ class CustomEnvironment(Environment):
         self.edgeDevices: list[Device] = edgeDevices
         self.cloud: Device = cloud
 
-        self.maxEnergy = rewardTuningParams[0]
-        self.minEnergy = rewardTuningParams[1]
-        self.ClassicFLTrainingTime = rewardTuningParams[2]
+        # self.maxEnergy = rewardTuningParams[0]
+        # self.minEnergy = rewardTuningParams[1]
+        self.ClassicFLEnergy = rewardTuningParams[0]
+        self.ClassicFLTrainingTime = rewardTuningParams[1]
         self.rewardOfEnergy = 0
         self.rewardOfTrainingTime = 0
         self.effectiveBandwidth = [[self.iotDevices[i].bandwidth] for i in range(self.iotDeviceNum)]
-        print(self.effectiveBandwidth)
+
         self.fraction = fraction
 
     def states(self):
@@ -58,6 +59,8 @@ class CustomEnvironment(Environment):
         return newState
 
     def rewardFun(self, action):
+        total_comp_e = 0
+        total_comm_e = 0
         allTrainingTimes = []
         edgesConnectedDeviceNum = [0] * self.edgeDeviceNum
 
@@ -92,35 +95,43 @@ class CustomEnvironment(Environment):
             offloadingPointsList.append(op2)
 
             # computing training time of this action
-            iotTrainingTime = self.iotDevices[int(i / 2)].trainingTime([op1, op2],
-                                                                       remainingFlops=iotRemainingFLOP[int(i / 2)])
-            edgeTrainingTime = self.edgeDevices[self.iotDevices[int(i / 2)].edgeIndex] \
-                .trainingTime([op1, op2],
-                              remainingFlops=edgeRemainingFLOP[self.iotDevices[int(i / 2)].edgeIndex])
-            cloudTrainingTime = self.cloud.trainingTime([op1, op2], remainingFlops=cloudRemainingFLOP)
+            iot_comp_e, iot_comm_e, iot_comp_tt, iot_comm_tt = self.iotDevices[int(i/2)].energy_tt(splitPoints=[op1, op2],
+                                                                                                   remainingFlops=iotRemainingFLOP[int(i/2)])
+            _, _, edge_comp_tt, edge_comm_tt = self.edgeDevices[self.iotDevices[int(i/2)].edgeIndex] \
+                .energy_tt(splitPoints=[op1, op2],
+                           remainingFlops=edgeRemainingFLOP[self.iotDevices[int(i/2)].edgeIndex])
+            _, _, cloud_comp_tt, cloud_comm_tt = self.cloud.energy_tt([op1, op2], remainingFlops=cloudRemainingFLOP)
 
-            self.effectiveBandwidth[int(i / 2)].append(self.iotDevices[int(i / 2)].effectiveBandwidth)
-
-            totalTrainingTime = iotTrainingTime + edgeTrainingTime + cloudTrainingTime
+            totalTrainingTime = (iot_comm_tt + iot_comp_tt) + (edge_comm_tt + edge_comp_tt) + (
+                    cloud_comm_tt + cloud_comp_tt)
             allTrainingTimes.append(totalTrainingTime)
+
             if totalTrainingTime > maxTrainingTime:
                 maxTrainingTime = totalTrainingTime
 
             # computing energy consumption of iot devices
-            iotEnergy = self.iotDevices[int(i / 2)].energyConsumption([op1, op2])
-            totalEnergyConsumption += iotEnergy
+            total_comp_e += iot_comp_e
+            total_comm_e += iot_comm_e
 
+        totalEnergyConsumption = (total_comm_e + total_comp_e)
         averageEnergyConsumption = totalEnergyConsumption / self.iotDeviceNum
 
         rewardOfTrainingTime = maxTrainingTime
-        rewardOfTrainingTime -= 400
-        rewardOfTrainingTime /= 100
+        rewardOfTrainingTime -= (self.ClassicFLTrainingTime)
+        rewardOfTrainingTime /= 4
         rewardOfTrainingTime *= -1
 
         rewardOfTrainingTime = min(max(rewardOfTrainingTime, -1), 1)
 
-        rewardOfEnergy = utils.normalizeReward(maxAmount=self.maxEnergy, minAmount=self.minEnergy,
-                                               x=averageEnergyConsumption, minNormalized=-1, maxNormalized=1)
+        rewardOfEnergy = averageEnergyConsumption
+        rewardOfEnergy -= self.ClassicFLEnergy
+        rewardOfEnergy /= 100
+        rewardOfEnergy *= -1
+
+        rewardOfEnergy = min(max(rewardOfEnergy, -1), 1)
+
+        # rewardOfEnergy = utils.normalizeReward(maxAmount=self.maxEnergy, minAmount=self.minEnergy,
+        #                                        x=averageEnergyConsumption, minNormalized=-1, maxNormalized=1)
 
         self.rewardOfEnergy = (self.fraction * rewardOfEnergy)
         self.rewardOfTrainingTime = (1 - self.fraction) * rewardOfTrainingTime
@@ -131,15 +142,15 @@ class CustomEnvironment(Environment):
             raise Exception("Fraction must be less than 1")
 
         logger.info("-------------------------------------------")
-        logger.info(f"Offloading layer : {offloadingPointsList} \n")
-        logger.info(f"Avg Energy : {averageEnergyConsumption} \n")
-        logger.info(f"Training time : {maxTrainingTime} \n")
-        logger.info(f"Reward of this action : {reward} \n")
-        logger.info(f"Reward of energy : {self.fraction * rewardOfEnergy} \n")
-        logger.info(f"Reward of training time : {(1 - self.fraction) * rewardOfTrainingTime} \n")
-        logger.info(f"IOTs Capacities : {iotRemainingFLOP} \n")
-        logger.info(f"Edges Capacities : {edgeRemainingFLOP} \n")
-        logger.info(f"Cloud Capacities : {cloudRemainingFLOP} \n")
+        logger.info(f"Offloading layer: {offloadingPointsList} \n")
+        logger.info(f"Avg Energy: {averageEnergyConsumption} \n")
+        logger.info(f"Training time: {maxTrainingTime} \n")
+        logger.info(f"Reward of this action: {reward} \n")
+        logger.info(f"Reward of energy: {self.fraction * rewardOfEnergy} \n")
+        logger.info(f"Reward of training time: {(1 - self.fraction) * rewardOfTrainingTime} \n")
+        logger.info(f"IOTs Capacities: {iotRemainingFLOP} \n")
+        logger.info(f"Edges Capacities: {edgeRemainingFLOP} \n")
+        logger.info(f"Cloud Capacities: {cloudRemainingFLOP} \n")
 
         # newState = [1 - utils.normalizeReward(self.maxEnergy, self.minEnergy, averageEnergyConsumption),
         #             1 - utils.normalizeReward(800, 49, maxTrainingTime)]

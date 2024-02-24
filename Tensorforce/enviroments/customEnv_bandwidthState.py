@@ -4,8 +4,8 @@ import numpy as np
 from tensorforce import Environment
 
 import Tensorforce.config as config
-from System.Device import Device
 from Tensorforce import utils
+from Tensorforce.enviroments.Device_bandwidthState import Device
 
 logger = logging.getLogger()
 
@@ -23,22 +23,34 @@ class CustomEnvironment(Environment):
         self.edgeDevices: list[Device] = edgeDevices
         self.cloud: Device = cloud
 
-        self.maxEnergy = rewardTuningParams[0]
-        self.minEnergy = rewardTuningParams[1]
-        self.ClassicFLTrainingTime = rewardTuningParams[2]
+        self.ClassicFLEnergy = rewardTuningParams[0]
+        self.ClassicFLTrainingTime = rewardTuningParams[1]
+
+        self.avgEnergy = 0
+        self.tt = 0
         self.rewardOfEnergy = 0
         self.rewardOfTrainingTime = 0
-        self.effectiveBandwidth = [[self.iotDevices[i].bandwidth] for i in range(self.iotDeviceNum)]
-        print(self.effectiveBandwidth)
+        self.energyOfComputation = 0
+        self.energyOfCommunication = 0
+        self.trainingTimeOfComputation = 0
+        self.trainingTimeOfCommunication = 0
+
+        self.effectiveBandwidth = []
+
         self.fraction = fraction
 
     def states(self):
-
-        # State = [Bandwidth of each client, bandwidth of each edge]
-        return dict(type="float", shape=(self.iotDeviceNum + self.edgeDeviceNum))
+        # State = [Bandwidth of each client, bandwidth of each edge, MaxTrainingTime, EnergyConsumption]
+        return dict(type="float", shape=(self.iotDeviceNum + self.edgeDeviceNum,))
 
     def actions(self):
         return dict(type="float", shape=(self.iotDeviceNum * 2,), min_value=0.0, max_value=1.0)
+
+    def setBandwidth(self, bandwidth: list[float]):
+        self.effectiveBandwidth = bandwidth
+
+    def getBandwidth(self):
+        return self.effectiveBandwidth
 
     def max_episode_timesteps(self):
         return super().max_episode_timesteps()
@@ -47,21 +59,30 @@ class CustomEnvironment(Environment):
         super().close()
 
     def reset(self):
-        bandwidths = []
-        for i in range():
+        iotBandwidths = []
+        for iotDevice in self.iotDevices:
+            iotBandwidths.append(np.random.uniform(low=iotDevice.bandwidth * 0.5, high=iotDevice.bandwidth))
 
-        randActions = np.random.uniform(low=0.0, high=1.0, size=(self.iotDeviceNum * 2))
-        # randActions = [config.LAYER_NUM-1] * 2 * self.iotDeviceNum
-        reward, newState = self.rewardFun(randActions)
-        return newState
+        edgeBandwidths = []
+        for edgeDevice in self.edgeDevices:
+            edgeBandwidths.append(np.random.uniform(low=edgeDevice.bandwidth * 0.5, high=edgeDevice.bandwidth))
+
+        self.setBandwidth(bandwidth=np.concatenate((iotBandwidths,edgeBandwidths),axis=0))
+        return self.getBandwidth()
 
     def rewardFun(self, action):
         allTrainingTimes = []
+        total_comp_e = 0
+        total_comm_e = 0
         edgesConnectedDeviceNum = [0] * self.edgeDeviceNum
 
         for i in range(0, len(action), 2):
+            self.iotDevices[int(i / 2)].setEffectiveBW(self.effectiveBandwidth[int(i / 2)])
             self.edgeDevices[self.iotDevices[int(i / 2)].edgeIndex].connectedDevice = 0
             self.cloud.connectedDevice = 0
+
+        for i in range(self.edgeDeviceNum):
+            self.edgeDevices[i].setEffectiveBW(self.effectiveBandwidth[i + self.iotDeviceNum])
 
         totalEnergyConsumption = 0
         maxTrainingTime = 0
@@ -90,36 +111,44 @@ class CustomEnvironment(Environment):
             offloadingPointsList.append(op2)
 
             # computing training time of this action
-            iotTrainingTime = self.iotDevices[int(i / 2)].trainingTime([op1, op2],
-                                                                       remainingFlops=iotRemainingFLOP[int(i / 2)])
-            edgeTrainingTime = self.edgeDevices[self.iotDevices[int(i / 2)].edgeIndex] \
-                .trainingTime([op1, op2],
-                              remainingFlops=edgeRemainingFLOP[self.iotDevices[int(i / 2)].edgeIndex])
-            cloudTrainingTime = self.cloud.trainingTime([op1, op2], remainingFlops=cloudRemainingFLOP)
+            iot_comp_e, iot_comm_e, iot_comp_tt, iot_comm_tt = self.iotDevices[int(i / 2)].energy_tt(
+                splitPoints=[op1, op2],
+                remainingFlops=iotRemainingFLOP[int(i / 2)])
+            _, _, edge_comp_tt, edge_comm_tt = self.edgeDevices[self.iotDevices[int(i / 2)].edgeIndex] \
+                .energy_tt(splitPoints=[op1, op2],
+                           remainingFlops=edgeRemainingFLOP[self.iotDevices[int(i / 2)].edgeIndex])
+            _, _, cloud_comp_tt, cloud_comm_tt = self.cloud.energy_tt([op1, op2], remainingFlops=cloudRemainingFLOP)
 
-            self.effectiveBandwidth[int(i / 2)].append(self.iotDevices[int(i / 2)].effectiveBandwidth)
-
-            totalTrainingTime = iotTrainingTime + edgeTrainingTime + cloudTrainingTime
+            totalTrainingTime = (iot_comm_tt + iot_comp_tt) + (edge_comm_tt + edge_comp_tt) + (
+                    cloud_comm_tt + cloud_comp_tt)
             allTrainingTimes.append(totalTrainingTime)
+
             if totalTrainingTime > maxTrainingTime:
                 maxTrainingTime = totalTrainingTime
 
             # computing energy consumption of iot devices
-            iotEnergy = self.iotDevices[int(i / 2)].energyConsumption([op1, op2])
-            totalEnergyConsumption += iotEnergy
+            total_comp_e += iot_comp_e
+            total_comm_e += iot_comm_e
 
+        totalEnergyConsumption = (total_comm_e + total_comp_e)
         averageEnergyConsumption = totalEnergyConsumption / self.iotDeviceNum
 
         rewardOfTrainingTime = maxTrainingTime
-        rewardOfTrainingTime -= 400
-        rewardOfTrainingTime /= 100
+        rewardOfTrainingTime -= self.ClassicFLTrainingTime
+        rewardOfTrainingTime /= 5
         rewardOfTrainingTime *= -1
 
         rewardOfTrainingTime = min(max(rewardOfTrainingTime, -1), 1)
 
-        rewardOfEnergy = utils.normalizeReward(maxAmount=self.maxEnergy, minAmount=self.minEnergy,
-                                               x=averageEnergyConsumption, minNormalized=-1, maxNormalized=1)
+        rewardOfEnergy = averageEnergyConsumption
+        rewardOfEnergy -= self.ClassicFLEnergy
+        rewardOfEnergy /= 100
+        rewardOfEnergy *= -1
 
+        rewardOfEnergy = min(max(rewardOfEnergy, -1), 1)
+
+        self.avgEnergy = averageEnergyConsumption
+        self.tt = maxTrainingTime
         self.rewardOfEnergy = (self.fraction * rewardOfEnergy)
         self.rewardOfTrainingTime = (1 - self.fraction) * rewardOfTrainingTime
 
@@ -132,6 +161,7 @@ class CustomEnvironment(Environment):
         logger.info(f"Offloading layer : {offloadingPointsList} \n")
         logger.info(f"Avg Energy : {averageEnergyConsumption} \n")
         logger.info(f"Training time : {maxTrainingTime} \n")
+        logger.info(f"Bandwidth : {maxTrainingTime} \n")
         logger.info(f"Reward of this action : {reward} \n")
         logger.info(f"Reward of energy : {self.fraction * rewardOfEnergy} \n")
         logger.info(f"Reward of training time : {(1 - self.fraction) * rewardOfTrainingTime} \n")
@@ -139,20 +169,15 @@ class CustomEnvironment(Environment):
         logger.info(f"Edges Capacities : {edgeRemainingFLOP} \n")
         logger.info(f"Cloud Capacities : {cloudRemainingFLOP} \n")
 
-        # newState = [1 - utils.normalizeReward(self.maxEnergy, self.minEnergy, averageEnergyConsumption),
-        #             1 - utils.normalizeReward(800, 49, maxTrainingTime)]
-        #
-        # allTrainingTimes = [1 - utils.normalizeReward(650, 49, trainingTime) for trainingTime in allTrainingTimes]
+        iotBandwidths = []
+        for iotDevice in self.iotDevices:
+            iotBandwidths.append(np.random.uniform(low=iotDevice.bandwidth * 0.5, high=iotDevice.bandwidth))
 
-        newState = [averageEnergyConsumption, maxTrainingTime]
-        newState.extend(allTrainingTimes)
-        newState.extend(edgesConnectedDeviceNum)
-        newState.append(self.cloud.connectedDevice)
-        # newState.extend(edgeRemainingFLOP)
-        # newState.append(cloudRemainingFLOP)
-        newState.extend(action)
-        logger.info(f"New State : {newState} \n")
-
+        edgeBandwidths = []
+        for edgeDevice in self.edgeDevices:
+            edgeBandwidths.append(np.random.uniform(low=edgeDevice.bandwidth * 0.5, high=edgeDevice.bandwidth))
+        newState = np.concatenate((iotBandwidths,edgeBandwidths),axis=0)
+        self.setBandwidth(newState)
         return reward, newState
 
     def execute(self, actions: list):

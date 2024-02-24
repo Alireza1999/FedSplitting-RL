@@ -1,20 +1,20 @@
 from Tensorforce.utils import *
 
-trainingTimeDefault_hist = np.load('default_tensorforce_trainingTimesHistEvaluation.npy')
-rewardDefault = np.load('default_tensorforce_rewards.npy')
-trainingTimeDefault = np.load('default_tensorforce_trainingTimes.npy')
+trainingTimeDefault_hist = np.load('./NumPy-Array/default_tensorforce_trainingTimesHistEvaluation.npy')
+rewardDefault = np.load('./NumPy-Array/default_tensorforce_rewards.npy')
+trainingTimeDefault = np.load('./NumPy-Array/default_tensorforce_trainingTimes.npy')
 
-trainingTimeDefaultNoEdge_hist = np.load('defaultNoEdge_tensorforce_trainingTimesHistEvaluation.npy')
-rewardDefaultNoEdge = np.load('defaultNoEdge_tensorforce_rewards.npy')
-trainingTimeDefaultNoEdge = np.load('defaultNoEdge_tensorforce_trainingTimes.npy')
+trainingTimeDefaultNoEdge_hist = np.load('./NumPy-Array/defaultNoEdge_tensorforce_trainingTimesHistEvaluation.npy')
+rewardDefaultNoEdge = np.load('./NumPy-Array/defaultNoEdge_tensorforce_rewards.npy')
+trainingTimeDefaultNoEdge = np.load('./NumPy-Array/defaultNoEdge_tensorforce_trainingTimes.npy')
 
-trainingTimefedAdapt_hist = np.load('fedAdapt_ppo_trainingTimesHistEvaluation.npy')
-rewardfedAdapt = np.load('fedAdapt_ppo_rewards.npy')
-trainingTimefedAdapt = np.load('fedAdapt_ppo_trainingTimes.npy')
+trainingTimefedAdapt_hist = np.load('./NumPy-Array/fedAdapt_ppo_trainingTimesHistEvaluation.npy')
+rewardfedAdapt = np.load('./NumPy-Array/fedAdapt_ppo_rewards.npy')
+trainingTimefedAdapt = np.load('./NumPy-Array/fedAdapt_ppo_trainingTimes.npy')
 
-trainingTimeRandom_hist = np.load('default_random_trainingTimes.npy')
+trainingTimeRandom_hist = np.load('./NumPy-Array/default_random_trainingTimes.npy')
 
-trainingTimeFirstFit_hist = np.load('default_firstFit_trainingTimes.npy')
+trainingTimeFirstFit_hist = np.load('./NumPy-Array/default_firstFit_trainingTimes.npy')
 print(len(rewardDefault))
 x = [i for i in range(2001)]
 xdefault = [i for i in range(501)]

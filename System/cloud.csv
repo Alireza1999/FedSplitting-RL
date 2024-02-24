@@ -1,2 +1,2 @@
-FLOPS,Bandwidth(MB/s)
-800,100
+FLOPS,Bandwidth(MB/s),MaxPower(watt)
+4000000,1.0,60

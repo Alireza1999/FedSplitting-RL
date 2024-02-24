@@ -14,7 +14,7 @@ def create(fraction, environment, timestepNum, saveSummariesPath):
         ),
 
         # Preprocessing
-        preprocessing=dict(type='linear_normalization', min_value=0.0, max_value=1.0),
+        # preprocessing=dict(type='linear_normalization', min_value=0.0, max_value=1.0),
 
         # Optimizer
         optimizer=dict(
@@ -50,8 +50,8 @@ def create(fraction, environment, timestepNum, saveSummariesPath):
         variable_noise=0.0,
 
         # Regularization
-        l2_regularization=0.0, entropy_regularization=0.1,
-        memory=200,
+        l2_regularization=0.1, entropy_regularization=0.0,
+        memory=300,
         # TensorFlow etc
         # saver=dict(directory='model', filename='model'),
         summarizer=dict(directory=f"{saveSummariesPath}/summaries/tensorforce_{fraction}",
@@ -62,7 +62,7 @@ def create(fraction, environment, timestepNum, saveSummariesPath):
 
         # Config
         config=dict(name='agent',
-                    device="CPU",
+                    device="GPU",
                     parallel_interactions=1,
                     seed=None,
                     execution=None,

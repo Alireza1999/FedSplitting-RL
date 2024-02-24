@@ -14,6 +14,7 @@ class Runner:
         self.log = True
 
     def run(self):
+
         saveGraphPath = f"Graphs/allPossibleSplitting/"
         energy = []
         trainingTime = []
@@ -23,34 +24,30 @@ class Runner:
         minTT = 1.0e7
         maxTT = 0
 
-        iotDevices = utils.createDeviceFromCSV(csvFilePath="../System/iotDevicesSmallScale.csv",
+        iotDevices = utils.createDeviceFromCSV(csvFilePath="../System/iotDevices.csv",
                                                deviceType='iotDevice')
-        edgeDevices = utils.createDeviceFromCSV(csvFilePath="../System/edgesSmallScale.csv")
+        edgeDevices = utils.createDeviceFromCSV(csvFilePath="../System/edges.csv")
         cloud = utils.createDeviceFromCSV(csvFilePath="../System/cloud.csv")[0]
 
         logger = createLog(fileName=f"AllPossibleSplitting")
 
-        splittingLayer = utils.allPossibleSplitting(modelLen=conf.LAYER_NUM, deviceNumber=len(iotDevices))
-        print(len(splittingLayer))
-
-        for splitting in splittingLayer:
-            splittingArray = list()
-            for char in splitting:
-                splittingArray.append(int(char))
-
-            avgEnergy, maxTrainingTime, iotFLOPS, edgeFLOPS, cloudFLOPS, allTrainingTime = preTrainEnv(
+        for i in range(10000):
+            splitting = utils.randomSelectionSplitting(modelLen=conf.LAYER_NUM, deviceNumber=len(iotDevices))
+            avgEnergy, maxTrainingTime, iotFLOPS, edgeFLOPS, cloudFLOPS, allTrainingTime, avgCommE, avgCompE = preTrainEnv(
                 iotDevices=iotDevices,
                 edgeDevices=edgeDevices,
                 cloud=cloud,
-                action=splittingArray)
+                action=splitting)
 
-            logger.info(f'Action : {splittingArray}')
-            logger.info(f"Energy : {avgEnergy}")
-            logger.info(f"Training Time : {maxTrainingTime}")
-            logger.info(f"IOT FLOPS : {iotFLOPS}")
-            logger.info(f"Edge FLOPS : {edgeFLOPS}")
-            logger.info(f"Cloud FLOPS : {cloudFLOPS}")
-            logger.info(f"All Training Time : {allTrainingTime}")
+            logger.info(f'Action: {splitting}')
+            logger.info(f"Energy: {avgEnergy}")
+            logger.info(f"Avg Communication E: {avgCommE}")
+            logger.info(f"Avg Computation E: {avgCompE}")
+            logger.info(f"Training Time: {maxTrainingTime}")
+            logger.info(f"IOT FLOPS: {iotFLOPS}")
+            logger.info(f"Edge FLOPS: {edgeFLOPS}")
+            logger.info(f"Cloud FLOPS: {cloudFLOPS}")
+            logger.info(f"All Training Time: {allTrainingTime}")
             logger.info(f"--------------------------------------------------")
 
             energy.append(avgEnergy)
@@ -58,25 +55,66 @@ class Runner:
 
             if avgEnergy < minEnergy:
                 minEnergy = avgEnergy
-                min_energy_splitting = splittingArray
-                minEnergyTrainingTime = trainingTime
+                min_energy_splitting = splitting
+                minEnergyTrainingTime = maxTrainingTime
+                minEnergyEdgeFLOPS = edgeFLOPS
+                minEnergyIOTFLOPS = iotFLOPS
+                minEnergyCloudFLOPS = cloudFLOPS
+
             if avgEnergy > maxEnergy:
                 maxEnergy = avgEnergy
-                max_Energy_splitting = splittingArray
-                maxEnergyTrainingTime = trainingTime
+                max_Energy_splitting = splitting
+                maxEnergyTrainingTime = maxTrainingTime
+                maxEnergyEdgeFLOPS = edgeFLOPS
+                maxEnergyIOTFLOPS = iotFLOPS
+                maxEnergyCloudFLOPS = cloudFLOPS
 
             if maxTrainingTime < minTT:
                 minTT = maxTrainingTime
-                min_trainingtime_splitting = splittingArray
+                min_trainingtime_splitting = splitting
                 minTrainingTimeEnergy = avgEnergy
+                minTTEdgeFLOPS = edgeFLOPS
+                minTTIOTFLOPS = iotFLOPS
+                minTTCloudFLOPS = cloudFLOPS
+
             if maxTrainingTime > maxTT:
                 maxTT = maxTrainingTime
-                max_trainingtime_splitting = splittingArray
+                max_trainingtime_splitting = splitting
                 maxTrainingTimeEnergy = avgEnergy
-        print(f"Max Energy : {maxEnergy}\n")
-        print(f"Min Energy : {minEnergy}\n")
-        print(f"Max Training Time : {maxTT}\n")
-        print(f"Min Training Time : {minTT}\n")
+                maxTTEdgeFLOPS = edgeFLOPS
+                maxTTIOTFLOPS = iotFLOPS
+                maxTTCloudFLOPS = cloudFLOPS
+
+        print("--------------------------------------------------")
+        print(f"Max Energy : {maxEnergy}")
+        print(f"Max Energy Splitting : {max_Energy_splitting}")
+        print(f"Max Energy Splitting Training Time : {maxEnergyTrainingTime}")
+        print(f"Max Energy Edge FLOPS : {maxEnergyEdgeFLOPS}")
+        print(f"Max Energy IOT FLOPS : {maxEnergyIOTFLOPS}")
+        print(f"Max Energy Cloud FLOPS : {maxEnergyCloudFLOPS}")
+        print("--------------------------------------------------")
+        print(f"Min Energy : {minEnergy}")
+        print(f"Min Energy Splitting : {min_energy_splitting}")
+        print(f"Min Energy Splitting Training Time : {minEnergyTrainingTime}")
+        print(f"Min Energy Edge FLOPS : {minEnergyEdgeFLOPS}")
+        print(f"Min Energy IOT FLOPS : {minEnergyIOTFLOPS}")
+        print(f"Min Energy Cloud FLOPS : {minEnergyCloudFLOPS}")
+        print("--------------------------------------------------")
+        print(f"Max Training Time : {maxTT}")
+        print(f"Max Training Time Splitting : {max_trainingtime_splitting}")
+        print(f"Max Training Time Splitting Energy : {maxTrainingTimeEnergy}")
+        print(f"Max Training Time Edge FLOPS : {maxTTEdgeFLOPS}")
+        print(f"Max Training Time IOT FLOPS : {maxTTIOTFLOPS}")
+        print(f"Max Training Time Cloud FLOPS : {maxTTCloudFLOPS}")
+        print("--------------------------------------------------")
+        print(f"Min Training Time : {minTT}")
+        print(f"Min Training Time Splitting : {min_trainingtime_splitting}")
+        print(f"Min Training Time Splitting Energy : {minTrainingTimeEnergy}")
+        print(f"Min Training Time Edge FLOPS : {minTTEdgeFLOPS}")
+        print(f"Min Training Time IOT FLOPS : {minTTIOTFLOPS}")
+        print(f"Min Training Time Cloud FLOPS : {minTTCloudFLOPS}")
+        print("--------------------------------------------------")
+
         # utils.draw_graph(title="Reward vs Episode",
         #                  xlabel="Episode",
         #                  ylabel="Reward",
@@ -158,59 +196,64 @@ def preTrainEnv(iotDevices: list[Device], edgeDevices: list[Device], cloud: Devi
     maxTrainingTime = 0
     offloadingPointsList = []
     allTrainingTime = []
+    total_comp_e = 0
+    total_comm_e = 0
 
-    for i in range(0, len(action), 2):
-        edgeDevices[iotDevices[int(i / 2)].edgeIndex].connectedDevice = 0
+    for i in range(len(action)):
+        edgeDevices[iotDevices[i].edgeIndex].connectedDevice = 0
         cloud.connectedDevice = 0
 
     iotRemainingFLOP = [iot.FLOPS for iot in iotDevices]
     edgeRemainingFLOP = [edge.FLOPS for edge in edgeDevices]
     cloudRemainingFLOP = cloud.FLOPS
 
-    for i in range(0, len(action), 2):
-        op1 = action[i]
-        op2 = action[i + 1]
+    for i in range(len(action)):
+        op1 = action[i][0]
+        op2 = action[i][1]
 
         cloudRemainingFLOP -= sum(conf.COMP_WORK_LOAD[op2 + 1:])
-        edgeRemainingFLOP[iotDevices[int(i / 2)].edgeIndex] -= sum(conf.COMP_WORK_LOAD[op1 + 1:op2 + 1])
-        iotRemainingFLOP[int(i / 2)] -= sum(conf.COMP_WORK_LOAD[0:op1 + 1])
+        edgeRemainingFLOP[iotDevices[i].edgeIndex] -= sum(conf.COMP_WORK_LOAD[op1 + 1:op2 + 1])
+        iotRemainingFLOP[i] -= sum(conf.COMP_WORK_LOAD[0:op1 + 1])
 
         if sum(conf.COMP_WORK_LOAD[op1 + 1:op2 + 1]):
-            edgeDevices[iotDevices[int(i / 2)].edgeIndex].connectedDevice += 1
+            edgeDevices[iotDevices[i].edgeIndex].connectedDevice += 1
         if sum(conf.COMP_WORK_LOAD[op2 + 1:]) != 0:
             cloud.connectedDevice += 1
 
-    for i in range(0, len(action), 2):
+    for i in range(len(action)):
         # Mapping float number to Offloading points
-        op1 = action[i]
-        op2 = action[i + 1]
+        op1 = action[i][0]
+        op2 = action[i][1]
         offloadingPointsList.append(op1)
         offloadingPointsList.append(op2)
 
         # computing training time of this action
-        iotTrainingTime = iotDevices[int(i / 2)].trainingTime(splitPoints=[op1, op2],
-                                                              remainingFlops=iotRemainingFLOP[int(i / 2)])
-        edgeTrainingTime = edgeDevices[iotDevices[int(i / 2)].edgeIndex] \
-            .trainingTime(splitPoints=[op1, op2],
-                          remainingFlops=edgeRemainingFLOP[iotDevices[int(i / 2)].edgeIndex],
-                          preTrain=True)
-        cloudTrainingTime = cloud.trainingTime([op1, op2], remainingFlops=cloudRemainingFLOP)
+        iot_comp_e, iot_comm_e, iot_comp_tt, iot_comm_tt = iotDevices[i].energy_tt(splitPoints=[op1, op2],
+                                                                                   remainingFlops=iotRemainingFLOP[i])
+        _, _, edge_comp_tt, edge_comm_tt = edgeDevices[iotDevices[i].edgeIndex] \
+            .energy_tt(splitPoints=[op1, op2],
+                       remainingFlops=edgeRemainingFLOP[iotDevices[i].edgeIndex])
+        _, _, cloud_comp_tt, cloud_comm_tt = cloud.energy_tt([op1, op2], remainingFlops=cloudRemainingFLOP)
 
-        totalTrainingTime = iotTrainingTime + edgeTrainingTime + cloudTrainingTime
+        totalTrainingTime = (iot_comm_tt + iot_comp_tt) + (edge_comm_tt + edge_comp_tt) + (
+                cloud_comm_tt + cloud_comp_tt)
         allTrainingTime.append(totalTrainingTime)
 
         if totalTrainingTime > maxTrainingTime:
             maxTrainingTime = totalTrainingTime
 
         # computing energy consumption of iot devices
-        iotEnergy = iotDevices[int(i / 2)].energyConsumption([op1, op2])
-        totalEnergyConsumption += iotEnergy
+        total_comp_e += iot_comp_e
+        total_comm_e += iot_comm_e
+        totalEnergyConsumption = (total_comm_e + total_comp_e)
 
+    avgCommE = total_comm_e / len(iotDevices)
+    avgCompE = total_comp_e / len(iotDevices)
     averageEnergyConsumption = totalEnergyConsumption / len(iotDevices)
     # averageEnergyConsumption = 1 - utils.normalizeReward(13.98, 1.68, averageEnergyConsumption),
     # maxTrainingTime = 1 - utils.normalizeReward(140, 0, maxTrainingTime)
 
-    return averageEnergyConsumption, maxTrainingTime, iotRemainingFLOP, edgeRemainingFLOP, cloudRemainingFLOP, allTrainingTime
+    return averageEnergyConsumption, maxTrainingTime, iotRemainingFLOP, edgeRemainingFLOP, cloudRemainingFLOP, allTrainingTime, avgCommE, avgCompE
 
 
 runer = Runner()
