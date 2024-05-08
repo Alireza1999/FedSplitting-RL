@@ -1,0 +1,2 @@
+model_checkpoint_path: "/home/alireza_soleymani/UniversityWorks/Thesis/FedSplitting-RL/Tensorforce/agent/tf_agent_1_1_1/0.5/agent-200200"
+all_model_checkpoint_paths: "/home/alireza_soleymani/UniversityWorks/Thesis/FedSplitting-RL/Tensorforce/agent/tf_agent_1_1_1/0.5/agent-200200"

@@ -9,9 +9,9 @@ import Tensorforce.config as conf
 
 class FirstFit:
 
-    def __init__(self, iotDevices: list[Device.Device], edgeDevices: list[Device], cloud: Device):
-        self.iotDevices: list[Device.Device] = iotDevices
-        self.edgeDevices: list[Device.Device] = edgeDevices
+    def __init__(self, iotDevices: list, edgeDevices: list, cloud: Device):
+        self.iotDevices: list = iotDevices
+        self.edgeDevices: list = edgeDevices
         self.cloud: Device.Device = cloud
 
     def initial_internals(self):

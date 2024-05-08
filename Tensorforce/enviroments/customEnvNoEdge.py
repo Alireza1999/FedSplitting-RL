@@ -12,12 +12,12 @@ logger = logging.getLogger()
 
 class CustomEnvironmentNoEdge(Environment):
 
-    def __init__(self, rewardTuningParams, iotDevices: list[Device], cloud: Device, fraction=0.0):
+    def __init__(self, rewardTuningParams, iotDevices: list, cloud: Device, fraction=0.0):
         super().__init__()
 
         self.iotDeviceNum: int = len(iotDevices)
 
-        self.iotDevices: list[Device] = iotDevices
+        self.iotDevices: list = iotDevices
         self.cloud: Device = cloud
 
         self.ClassicFLTrainingTime = rewardTuningParams[2]

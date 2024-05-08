@@ -1,3 +1,7 @@
 COMP_WORK_LOAD = [884736, 0, 4718592, 0, 2359296, 524288, 1280]  # Computation workload for each layer (FLOP) VGG5 FLOPS
 LAYER_NUM = len(COMP_WORK_LOAD)  # Number of model Layer
-SIZE_OF_PARAM = [0.0008325, 0.0008325, 0.010492, 0.010492, 0.029, 0.291]  # Size of parameter send from each layer to next layer (MB)
+SIZE_OF_PARAM = [12.501700401, 3.126700401, 6.251700401, 1.564199448, 1.564199448, 0.050506592] # IN MB
+COMP_ENERGY_OF_LAYERS_clients = [5.2, 3.9, 13.1, 1.45, 3.24, 0.80, 0.46]
+COMP_TIME_OF_LAYERS_clients = [4.5, 2.5, 6.15, 2.0, 3.7, 1.8, 1.35]
+COMP_TIME_OF_LAYERS_edges = [2.25, 1.25, 3.07, 1.0, 1.8, 0.9, 0.65]
+COMP_TIME_OF_LAYERS_cloud = [1.125, 0.65, 1.53, 0.5, 0.9, 0.45, 0.325]

@@ -11,12 +11,12 @@ logger = logging.getLogger()
 
 class FedAdaptEnv(Environment):
 
-    def __init__(self, allTrainingTime, iotDevices: list[Device], cloud: Device, groupNum: int = 1):
+    def __init__(self, allTrainingTime, iotDevices: list, cloud: Device, groupNum: int = 1):
         super().__init__()
 
         self.groupNum = groupNum
         self.iotDeviceNum: int = len(iotDevices)
-        self.iotDevices: list[Device] = iotDevices
+        self.iotDevices: list = iotDevices
         self.cloud: Device = cloud
 
         self.rewardTuningParams = allTrainingTime

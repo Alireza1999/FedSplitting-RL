@@ -4,23 +4,23 @@ import numpy as np
 from tensorforce import Environment
 
 import Tensorforce.config as config
-from entities.Device import Device
 from Tensorforce import utils
+from entities.Device import Device
 
 logger = logging.getLogger()
 
 
 class CustomEnvironment(Environment):
 
-    def __init__(self, rewardTuningParams, iotDevices: list[Device], edgeDevices: list[Device], cloud: Device,
+    def __init__(self, rewardTuningParams, iotDevices: list, edgeDevices: list, cloud: Device,
                  fraction=0.8):
         super().__init__()
 
         self.iotDeviceNum: int = len(iotDevices)
         self.edgeDeviceNum: int = len(edgeDevices)
 
-        self.iotDevices: list[Device] = iotDevices
-        self.edgeDevices: list[Device] = edgeDevices
+        self.iotDevices: list = iotDevices
+        self.edgeDevices: list = edgeDevices
         self.cloud: Device = cloud
 
         # self.maxEnergy = rewardTuningParams[0]
@@ -39,9 +39,10 @@ class CustomEnvironment(Environment):
         # cloud , prevAction ]
         # return dict(type="float", shape=(1 + 1 + self.edgeDeviceNum + 1 + self.iotDeviceNum * 2))
 
-        # State = [AvgEnergy ,maxTrainingTime , TrainingTime of Each device,  number of connected device to each edge,
+        # State = [cumulative AvgEnergy,cumulative maxTrainingTime,BW of clients,BW of edges, TrainingTime of Each device,  number of connected device to each edge,
         # number of devices connected to cloud , prevAction]
-        return dict(type="float", shape=(1 + 1 + self.iotDeviceNum + self.edgeDeviceNum + 1 + self.iotDeviceNum * 2))
+        return dict(type="float", shape=(
+                1 + 1 + self.iotDeviceNum + self.edgeDeviceNum + self.iotDeviceNum + self.edgeDeviceNum + 1 + self.iotDeviceNum * 2))
 
     def actions(self):
         return dict(type="float", shape=(self.iotDeviceNum * 2,), min_value=0.0, max_value=1.0)
@@ -95,11 +96,12 @@ class CustomEnvironment(Environment):
             offloadingPointsList.append(op2)
 
             # computing training time of this action
-            iot_comp_e, iot_comm_e, iot_comp_tt, iot_comm_tt = self.iotDevices[int(i/2)].energy_tt(splitPoints=[op1, op2],
-                                                                                                   remainingFlops=iotRemainingFLOP[int(i/2)])
-            _, _, edge_comp_tt, edge_comm_tt = self.edgeDevices[self.iotDevices[int(i/2)].edgeIndex] \
+            iot_comp_e, iot_comm_e, iot_comp_tt, iot_comm_tt = self.iotDevices[int(i / 2)].energy_tt(
+                splitPoints=[op1, op2],
+                remainingFlops=iotRemainingFLOP[int(i / 2)])
+            _, _, edge_comp_tt, edge_comm_tt = self.edgeDevices[self.iotDevices[int(i / 2)].edgeIndex] \
                 .energy_tt(splitPoints=[op1, op2],
-                           remainingFlops=edgeRemainingFLOP[self.iotDevices[int(i/2)].edgeIndex])
+                           remainingFlops=edgeRemainingFLOP[self.iotDevices[int(i / 2)].edgeIndex])
             _, _, cloud_comp_tt, cloud_comm_tt = self.cloud.energy_tt([op1, op2], remainingFlops=cloudRemainingFLOP)
 
             totalTrainingTime = (iot_comm_tt + iot_comp_tt) + (edge_comm_tt + edge_comp_tt) + (
@@ -118,14 +120,14 @@ class CustomEnvironment(Environment):
 
         rewardOfTrainingTime = maxTrainingTime
         rewardOfTrainingTime -= (self.ClassicFLTrainingTime)
-        rewardOfTrainingTime /= 4
+        rewardOfTrainingTime /= 25
         rewardOfTrainingTime *= -1
 
         rewardOfTrainingTime = min(max(rewardOfTrainingTime, -1), 1)
 
         rewardOfEnergy = averageEnergyConsumption
         rewardOfEnergy -= self.ClassicFLEnergy
-        rewardOfEnergy /= 100
+        rewardOfEnergy /= 25
         rewardOfEnergy *= -1
 
         rewardOfEnergy = min(max(rewardOfEnergy, -1), 1)

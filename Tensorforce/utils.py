@@ -7,14 +7,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
 
-from entities.Device import Device
 from Tensorforce import config
 from Tensorforce.enviroments import customEnv_bandwidthState, customEnv, customEnvNoEdge, fedAdaptEnv
-from entities.Device_bandwidthState import Device as Device2
-from Tensorforce.splittingMethods import FirstFit, PPO, TRPO, RandomAgent, NoSplitting, TensorforceAgent, AC
+from Tensorforce.splittingMethods import FirstFit, PPO, TRPO, RandomAgent, NoSplitting, TensorforceAgent, AC, tunerAgent
+from entities.Device_bandwidthState import Device as Device
 
 
-def createDeviceFromCSV(csvFilePath: str, deviceType: str = 'cloud') -> list[Device]:
+# from entities.Device import Device
+
+
+def createDeviceFromCSV(csvFilePath: str, deviceType: str = 'cloud') -> list:
     devices = list()
     with open(csvFilePath, 'r') as device:
         csvreader = csv.reader(device)
@@ -22,11 +24,11 @@ def createDeviceFromCSV(csvFilePath: str, deviceType: str = 'cloud') -> list[Dev
             if row[0] == 'FLOPS':
                 continue
             if deviceType == 'iotDevice':
-                device = Device2(deviceType=deviceType, FLOPS=int(row[0]), bandwidth=float(row[1]),
-                                 edgeIndex=int(row[2]), maxPower=float(row[3]))
+                device = Device(deviceType=deviceType, FLOPS=int(row[0]), bandwidth=float(row[1]),
+                                edgeIndex=int(row[2]), maxPower=float(row[3]))
             else:
-                device = Device2(deviceType=deviceType, FLOPS=int(row[0]), bandwidth=float(row[1]),
-                                 maxPower=float(row[2]))
+                device = Device(deviceType=deviceType, FLOPS=int(row[0]), bandwidth=float(row[1]),
+                                maxPower=float(row[2]))
             devices.append(device)
     return devices
 
@@ -88,37 +90,78 @@ def draw_3dGraph(x, y, z, xlabel, ylabel, zlabel):
     fig.show()
 
 
-def actionToLayer(splitDecision: list[float]) -> tuple[int, int]:
+def actionToLayer(splitDecision: list) -> tuple:
     """ It returns the offloading points for the given action ( op1 , op2 )"""
+    if splitDecision[0] >= 0.96:
+        return 6, 6
+    else:
+        op1: float
+        op2: float  # Offloading points op1, op2
+        workLoad = []
+        model_state_flops = []
 
-    totalWorkLoad = sum(config.COMP_WORK_LOAD[1:])
+        for l in config.COMP_WORK_LOAD:
+            workLoad.append(l)
+            model_state_flops.append(sum(workLoad))
 
-    op1: int
-    op2: int = 0  # Offloading points op1, op2
+        totalWorkLoad = sum(workLoad)
+        model_flops_list = np.array(model_state_flops)
+        model_flops_list = model_flops_list / totalWorkLoad
+        idx = np.where(np.abs(model_flops_list - splitDecision[0]) == np.abs(model_flops_list - splitDecision[0]).min())
+        op1 = int(idx[0][-1])
 
-    op1_workload = splitDecision[0] * totalWorkLoad
-    for i in range(0, config.LAYER_NUM):
-        difference = abs(sum(config.COMP_WORK_LOAD[:i + 1]) - op1_workload)
-        temp2 = abs(sum(config.COMP_WORK_LOAD[:i + 2]) - op1_workload)
-        if temp2 > difference:
-            op1 = i
-            break
+        op2_totalWorkload = sum(workLoad[op1:])
+        model_state_flops = []
+        for l in range(op1, config.LAYER_NUM):
+            model_state_flops.append(sum(workLoad[op1:l + 1]))
+        model_flops_list = np.array(model_state_flops)
+        model_flops_list = model_flops_list / op2_totalWorkload
 
-    if splitDecision[1] != -1:
-        remindedWorkLoad = sum(config.COMP_WORK_LOAD[op1 + 1:]) * splitDecision[1]
+        idx = np.where(np.abs(model_flops_list - splitDecision[1]) == np.abs(model_flops_list - splitDecision[1]).min())
+        op2 = int(idx[0][-1]) + op1
 
-        for i in range(op1, len(config.COMP_WORK_LOAD)):
-            difference = abs(sum(config.COMP_WORK_LOAD[op1 + 1:i + 1]) - remindedWorkLoad)
-            temp2 = abs(sum(config.COMP_WORK_LOAD[op1 + 1:i + 2]) - remindedWorkLoad)
-            if temp2 >= difference:
-                op2 = i
-                break
-        if op2 == 0:
-            op2 = op2 + 1
-        if op1 == config.LAYER_NUM - 1:
-            op2 = config.LAYER_NUM - 1
+        return op1, op2
 
-    return op1, op2
+
+# def actionToLayer(splitDecision: list[float]) -> tuple[int, int]:
+#     """ It returns the offloading points for the given action ( op1 , op2 )"""
+#
+#     totalWorkLoad = sum(config.COMP_WORK_LOAD[1:])
+#
+#     op1: int
+#     op2: int = 0  # Offloading points op1, op2
+#
+#     op1_workload = splitDecision[0] * totalWorkLoad
+#     print(f"op1 WL: {op1_workload}")
+#     for i in range(0, config.LAYER_NUM):
+#         difference = abs(sum(config.COMP_WORK_LOAD[:i + 1]) - op1_workload)
+#         if i < 6:
+#             temp2 = abs(sum(config.COMP_WORK_LOAD[:i + 2]) - op1_workload)
+#         else:
+#             temp2 = abs(sum(config.COMP_WORK_LOAD) - op1_workload)
+#         print()
+#         print(f"i: {i}")
+#         print(f"def : {difference}")
+#         print(f"temp: {temp2}")
+#         if temp2 > difference:
+#             op1 = i
+#             break
+#
+#     if splitDecision[1] != -1:
+#         remindedWorkLoad = sum(config.COMP_WORK_LOAD[op1 + 1:]) * splitDecision[1]
+#
+#         for i in range(op1, len(config.COMP_WORK_LOAD)):
+#             difference = abs(sum(config.COMP_WORK_LOAD[op1 + 1:i + 1]) - remindedWorkLoad)
+#             temp2 = abs(sum(config.COMP_WORK_LOAD[op1 + 1:i + 2]) - remindedWorkLoad)
+#             if temp2 >= difference:
+#                 op2 = i
+#                 break
+#         if op2 == 0:
+#             op2 = op2 + 1
+#         if op1 == config.LAYER_NUM - 1:
+#             op2 = config.LAYER_NUM - 1
+#
+#     return op1, op2
 
 
 def sigmoidActivation(x: float) -> float:
@@ -154,7 +197,7 @@ def convert_To_Len_th_base(n, arr, modelLen, deviceNumber, allPossible):
     allPossible.append(a)
 
 
-def randomSelectionSplitting(modelLen, deviceNumber) -> list[list[int]]:
+def randomSelectionSplitting(modelLen, deviceNumber) -> list:
     splittingForOneDevice = []
     for i in range(0, modelLen):
         for j in range(0, i + 1):
@@ -277,6 +320,8 @@ def ClassicFLTrainingTime(iotDevices, edgeDevices, cloud):
     totalEnergyConsumption = (total_comm_e + total_comp_e)
     avgCommE = total_comm_e / len(iotDevices)
     avgCompE = total_comp_e / len(iotDevices)
+    print(f"Computation E: {total_comp_e}")
+    print(f"Communication E: {total_comm_e}")
     averageEnergyConsumption = totalEnergyConsumption / len(iotDevices)
     return averageEnergyConsumption, maxTrainingTime
 
@@ -356,6 +401,9 @@ def createAgent(agentType, fraction, timestepNum, environment, saveSummariesPath
         return NoSplitting.NoSplitting(environment=environment)
     elif agentType == 'firstFit':
         return FirstFit.FirstFit(iotDevices=iotDevices, edgeDevices=edgeDevices, cloud=cloud)
+    if agentType == 'tuner':
+        return tunerAgent.create(fraction=fraction, environment=environment, timestepNum=timestepNum,
+                                 saveSummariesPath=saveSummariesPath)
     else:
         raise Exception('Invalid config select from [ppo, ac, tensorforce, random]')
 
@@ -369,7 +417,7 @@ def createLog(fileName):
     return logger
 
 
-def preTrainEnv(iotDevices: list[Device], edgeDevices: list[Device], cloud: Device, action) -> tuple[float, float]:
+def preTrainEnv(iotDevices: list, edgeDevices: list, cloud: Device, action) -> tuple:
     edgesConnectedDeviceNum = [0] * len(edgeDevices)
 
     for i in range(0, len(action), 2):

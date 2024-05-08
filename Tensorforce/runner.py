@@ -5,8 +5,8 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from tensorforce import Environment
-
+from tensorforce import Environment, Agent
+import tune as tuner
 from Tensorforce import utils
 
 logger = logging.getLogger()
@@ -79,12 +79,16 @@ class Runner:
                                       cloud=cloud)
 
             if self.envType == "defaultWithBandwidth":
+                tuner.main(env)
                 bandwidthInStateRunner(envObject=envObject,
                                        env=env,
                                        agent=agent,
                                        timestepNum=self.timestepNum,
                                        episodeNum=self.episodeNum,
                                        saveGraphPath=self.saveGraphPath,
+                                       envType=self.envType,
+                                       agentType=self.agentType,
+                                       fraction=self.fraction,
                                        saveLog=self.log)
             else:
                 if self.log:
@@ -221,18 +225,18 @@ class Runner:
                 plt.savefig(os.path.join(self.saveGraphPath, f"Reward_energy_trainingTime"))
                 plt.close()
 
-                # hexadecimal_alphabets = '0123456789ABCDEF'
-                # color = ["#" + ''.join([random.choice(hexadecimal_alphabets) for j in range(6)]) for i in
-                #          range(len(iotDevices))]
-                # plt.figure(figsize=(int(10), int(5)))  # Set the figure size
-                # for i in range(len(iotDevices)):
-                #     plt.plot(y, envObject.effectiveBandwidth[i], color=color[i], label=f'client-{i}')
-                # plt.legend()
-                # plt.title("All Reward Graphs")
-                # plt.xlabel("timesteps")
-                # plt.ylabel("Bandwidth")
-                # plt.savefig(os.path.join(self.saveGraphPath, f"Bandwidth"))
-                # plt.close()
+                hexadecimal_alphabets = '0123456789ABCDEF'
+                color = ["#" + ''.join([random.choice(hexadecimal_alphabets) for j in range(6)]) for i in
+                         range(len(iotDevices))]
+                plt.figure(figsize=(int(10), int(5)))  # Set the figure size
+                for i in range(len(iotDevices)):
+                    plt.plot(y, envObject.effectiveBandwidth[i], color=color[i], label=f'client-{i}')
+                plt.legend()
+                plt.title("All Reward Graphs")
+                plt.xlabel("timesteps")
+                plt.ylabel("Bandwidth")
+                plt.savefig(os.path.join(self.saveGraphPath, f"Bandwidth"))
+                plt.close()
 
                 utils.draw_3dGraph(
                     x=energyConsumption,
@@ -248,7 +252,9 @@ class Runner:
                     evaluationTrainingTimes = []
                     sum_rewards = 0.0
                     x = []
-
+                    agent = Agent.load(
+                        directory="/home/alireza_soleymani/UniversityWorks/Thesis/FedSplitting-RL/Tensorforce/agent/tf_agent_1_1_1/0.5/",
+                        format="tensorflow")
                     for i in range(100):
                         # if i >= 50:
                         #     for k in range(len(iotDevices)):
@@ -280,7 +286,7 @@ class Runner:
                                      x=x,
                                      y=rewardEvalEpisode,
                                      savePath=self.saveGraphPath,
-                                     pictureName=f"Reward_episode_evaluation")
+                                     pictureName=f"Reward_episode_evaluation_nice")
 
                     print('Mean episode reward:', sum_rewards / 100)
 
@@ -439,7 +445,7 @@ def FedAdaptRunner(timestepNum, episodeNum, rewardTuningParams):
     env.close()
 
 
-def bandwidthInStateRunner(envObject, env, agent, timestepNum, episodeNum, saveGraphPath,
+def bandwidthInStateRunner(envObject, env, agent, timestepNum, episodeNum, saveGraphPath, envType, agentType, fraction,
                            saveLog: bool = True):
     sumRewardOfEpisodes = list()
     rewardOfEnergy = list()
@@ -447,16 +453,16 @@ def bandwidthInStateRunner(envObject, env, agent, timestepNum, episodeNum, saveG
     energyConsumption = list()
     trainingTimeOfEpisode = list()
     trainingTimeOfAllTimesteps = list()
-    logger = utils.createLog(fileName=f"defaultBandwidthInState_tensorforce_1.0")
+    logger = utils.createLog(fileName=f"{envType}_{agentType}_{fraction}")
 
     y = list()
     x = list()
     AvgEnergyOfIotDevices = list()
     timestepCounter = 0
     for i in range(episodeNum):
-        if saveLog:
-            logger.info("===========================================")
-            logger.info("Episode {} started ...\n".format(i))
+        # if saveLog:
+        #     logger.info("===========================================")
+        #     logger.info("Episode {} started ...\n".format(i))
 
         episode_energy = list()
         episode_trainingTime = list()
@@ -465,17 +471,24 @@ def bandwidthInStateRunner(envObject, env, agent, timestepNum, episodeNum, saveG
         episode_rewardOfTrainingTime = list()
 
         states = env.reset()
+        logger.info(f"State: {states}\n")
 
         y.append(timestepCounter)
         timestepCounter += 1
+        envObject.setCurrentTimestep(0)
 
-        internals = agent.initial_internals()
         for j in range(timestepNum):
-            if saveLog:
-                logger.info("-------------------------------------------")
-                logger.info(f"Timestep {timestepCounter} \n")
+            # if saveLog:
+            #     logger.info("-------------------------------------------")
+            #     logger.info(f"Timestep {timestepCounter} \n")
 
+            # normState = states
+            # for k in range(len(states)):
+            #     normState[k] = utils.normalizeReward(10, 0, states[k], 0, 1)
+            states[0] /= (envObject.ClassicFLEnergy * (i + 1))
+            states[1] /= (envObject.ClassicFLTrainingTime * (i + 1))
             actions = agent.act(states=states)
+            # logger.info(f"State: {states}\n")
             states, terminal, reward = env.execute(actions=actions)
             agent.observe(terminal=terminal, reward=reward)
 
@@ -485,7 +498,7 @@ def bandwidthInStateRunner(envObject, env, agent, timestepNum, episodeNum, saveG
             episode_energy.append(envObject.avgEnergy)
             episode_trainingTime.append(envObject.tt)
             AvgEnergyOfIotDevices.append(envObject.avgEnergy)
-
+            envObject.setCurrentTimestep(j)
             y.append(timestepCounter)
             timestepCounter += 1
 
@@ -497,46 +510,6 @@ def bandwidthInStateRunner(envObject, env, agent, timestepNum, episodeNum, saveG
         trainingTimeOfAllTimesteps = np.append(trainingTimeOfAllTimesteps, episode_trainingTime)
 
         x.append(i)
-        if i != 0 and i % int(episodeNum / 2) == 0:
-            utils.draw_graph(title="Reward vs Episode",
-                             xlabel="Episode",
-                             ylabel="Reward",
-                             figSizeX=10,
-                             figSizeY=5,
-                             x=x,
-                             y=sumRewardOfEpisodes,
-                             savePath=saveGraphPath,
-                             pictureName=f"Reward_episode{i}")
-
-            utils.draw_graph(title="Avg Energy vs Episode",
-                             xlabel="Episode",
-                             ylabel="Average Energy",
-                             figSizeX=10,
-                             figSizeY=5,
-                             x=x,
-                             y=energyConsumption,
-                             savePath=saveGraphPath,
-                             pictureName=f"Energy_episode{i}")
-
-            utils.draw_graph(title="Avg TrainingTime vs Episode",
-                             xlabel="Episode",
-                             ylabel="TrainingTime",
-                             figSizeX=10,
-                             figSizeY=5,
-                             x=x,
-                             y=trainingTimeOfEpisode,
-                             savePath=saveGraphPath,
-                             pictureName=f"TrainingTime_episode{i}")
-
-            utils.draw_scatter(title="Energy vs TrainingTime",
-                               xlabel="Energy",
-                               ylabel="TrainingTime",
-                               x=energyConsumption,
-                               y=trainingTimeOfEpisode,
-                               savePath=saveGraphPath,
-                               pictureName=f"Scatter{i}")
-    y.append(timestepCounter)
-    timestepCounter += 1
 
     utils.draw_hist(title='Avg Energy of IoT Devices',
                     x=AvgEnergyOfIotDevices,
@@ -549,6 +522,47 @@ def bandwidthInStateRunner(envObject, env, agent, timestepNum, episodeNum, saveG
                     xlabel="TrainingTime",
                     savePath=saveGraphPath,
                     pictureName='TrainingTime_hist')
+
+    utils.draw_graph(title="Reward vs Episode",
+                     xlabel="Episode",
+                     ylabel="Reward",
+                     figSizeX=10,
+                     figSizeY=5,
+                     x=x,
+                     y=sumRewardOfEpisodes,
+                     savePath=saveGraphPath,
+                     pictureName=f"Reward_episode")
+
+    utils.draw_graph(title="Avg Energy vs Episode",
+                     xlabel="Episode",
+                     ylabel="Average Energy",
+                     figSizeX=10,
+                     figSizeY=5,
+                     x=x,
+                     y=energyConsumption,
+                     savePath=saveGraphPath,
+                     pictureName=f"Energy_episode")
+
+    utils.draw_graph(title="Avg TrainingTime vs Episode",
+                     xlabel="Episode",
+                     ylabel="TrainingTime",
+                     figSizeX=10,
+                     figSizeY=5,
+                     x=x,
+                     y=trainingTimeOfEpisode,
+                     savePath=saveGraphPath,
+                     pictureName=f"TrainingTime_episode")
+
+    utils.draw_scatter(title="Energy vs TrainingTime",
+                       xlabel="Energy",
+                       ylabel="TrainingTime",
+                       x=energyConsumption,
+                       y=trainingTimeOfEpisode,
+                       savePath=saveGraphPath,
+                       pictureName=f"Scatter")
+
+    y.append(timestepCounter)
+    timestepCounter += 1
 
     # trainingTimes = np.array(trainingTimeOfEpisode)
     # np.save(f'{self.envType}_{self.agentType}_trainingTimes.npy', trainingTimes)
@@ -587,14 +601,15 @@ def bandwidthInStateRunner(envObject, env, agent, timestepNum, episodeNum, saveG
         z=sumRewardOfEpisodes,
         xlabel=f"Energy {saveGraphPath}",
         ylabel="Training Time",
-        zlabel="reward"
-    )
+        zlabel="reward")
 
     # Evaluate for 100 episodes
     rewardEvalEpisode = []
     evaluationTrainingTimes = []
     sum_rewards = 0.0
     x = []
+    logger.info("Evaluation Started")
+    logger.info("===========================================")
 
     for i in range(100):
         # if i >= 50:
@@ -604,11 +619,21 @@ def bandwidthInStateRunner(envObject, env, agent, timestepNum, episodeNum, saveG
         states = env.reset()
         internals = agent.initial_internals()
         terminal = False
+        envObject.setCurrentTimestep(0)
+        i = 0
         while not terminal:
-            actions, internals = agent.act(states=states, internals=internals, evaluation=True)
+            logger.info(f"state: {states}")
+            actions, internals = agent.act(states=states, internals=internals, independent=True)
+            op1, op2 = utils.actionToLayer(actions)
+            logger.info(f"action: {op1}, {op2}")
+            envObject.setCurrentTimestep(i)
             states, terminal, reward = env.execute(actions=actions)
+            logger.info(f"reward: {reward}")
+            logger.info("===========================")
             rewardEval.append(reward)
             sum_rewards += reward
+            i += 1
+
         rewardEvalEpisode.append(sum(rewardEval) / timestepNum)
         x.append(i)
 

@@ -1,4 +1,5 @@
 import logging
+import random
 
 import numpy as np
 from tensorforce import Environment
@@ -12,19 +13,24 @@ logger = logging.getLogger()
 
 class CustomEnvironment(Environment):
 
-    def __init__(self, rewardTuningParams, iotDevices: list[Device], edgeDevices: list[Device], cloud: Device,
+    def __init__(self, rewardTuningParams, iotDevices: list, edgeDevices: list, cloud: Device,
                  fraction=0.8):
         super().__init__()
 
         self.iotDeviceNum: int = len(iotDevices)
         self.edgeDeviceNum: int = len(edgeDevices)
 
-        self.iotDevices: list[Device] = iotDevices
-        self.edgeDevices: list[Device] = edgeDevices
+        self.iotDevices: list = iotDevices
+        self.edgeDevices: list = edgeDevices
         self.cloud: Device = cloud
 
         self.ClassicFLEnergy = rewardTuningParams[0]
         self.ClassicFLTrainingTime = rewardTuningParams[1]
+
+        self.currentTimestep = 0
+
+        self.cumulativeEnergy = 0
+        self.cumulativeTT = 0
 
         self.avgEnergy = 0
         self.tt = 0
@@ -40,17 +46,36 @@ class CustomEnvironment(Environment):
         self.fraction = fraction
 
     def states(self):
-        # State = [Bandwidth of each client, bandwidth of each edge, MaxTrainingTime, EnergyConsumption]
-        return dict(type="float", shape=(self.iotDeviceNum + self.edgeDeviceNum,))
+        # State = [ Culmulative Energy, Cumulative training time, Bandwidth of each client, bandwidth of each edge, MaxTrainingTime, EnergyConsumption, prevAction]
+        return dict(type="float", shape=(2 + self.iotDeviceNum + self.edgeDeviceNum + 2 * self.iotDeviceNum,),
+                    min_value=0, max_value=1000000)
 
     def actions(self):
         return dict(type="float", shape=(self.iotDeviceNum * 2,), min_value=0.0, max_value=1.0)
 
-    def setBandwidth(self, bandwidth: list[float]):
+    def setBandwidth(self, bandwidth: list):
         self.effectiveBandwidth = bandwidth
 
     def getBandwidth(self):
         return self.effectiveBandwidth
+
+    def setCumulativeEnergy(self, energy):
+        self.cumulativeEnergy = energy
+
+    def getCumulativeEnergy(self):
+        return self.cumulativeEnergy
+
+    def setCumulativeTT(self, TT):
+        self.cumulativeTT = TT
+
+    def getCumulativeTT(self):
+        return self.cumulativeTT
+
+    def setCurrentTimestep(self, ts):
+        self.currentTimestep = ts
+
+    def getCurrentTimestep(self):
+        return self.currentTimestep
 
     def max_episode_timesteps(self):
         return super().max_episode_timesteps()
@@ -59,16 +84,25 @@ class CustomEnvironment(Environment):
         super().close()
 
     def reset(self):
+        self.timestep = 0
+        self.setCumulativeEnergy(0)
+        self.setCumulativeTT(0)
+
+        # randActions = np.random.uniform(low=0.0, high=1.0, size=(self.iotDeviceNum * 2))
+        randActions = [config.LAYER_NUM - 1] * 2 * self.iotDeviceNum
         iotBandwidths = []
         for iotDevice in self.iotDevices:
-            iotBandwidths.append(np.random.uniform(low=iotDevice.bandwidth * 0.5, high=iotDevice.bandwidth))
+            iotBandwidths.append(np.random.uniform(low=iotDevice.bandwidth * 1.0, high=iotDevice.bandwidth))
 
         edgeBandwidths = []
         for edgeDevice in self.edgeDevices:
-            edgeBandwidths.append(np.random.uniform(low=edgeDevice.bandwidth * 0.5, high=edgeDevice.bandwidth))
+            edgeBandwidths.append(np.random.uniform(low=edgeDevice.bandwidth * 1.0, high=edgeDevice.bandwidth))
 
-        self.setBandwidth(bandwidth=np.concatenate((iotBandwidths,edgeBandwidths),axis=0))
-        return self.getBandwidth()
+        self.setBandwidth(bandwidth=np.concatenate((iotBandwidths, edgeBandwidths), axis=0))
+
+        reward, newState = self.rewardFun(randActions)
+
+        return np.concatenate((newState[:2], self.getBandwidth(), randActions), axis=0)
 
     def rewardFun(self, action):
         allTrainingTimes = []
@@ -133,16 +167,19 @@ class CustomEnvironment(Environment):
         totalEnergyConsumption = (total_comm_e + total_comp_e)
         averageEnergyConsumption = totalEnergyConsumption / self.iotDeviceNum
 
+        self.setCumulativeEnergy(self.getCumulativeEnergy() + averageEnergyConsumption)
+        self.setCumulativeTT(self.getCumulativeTT() + maxTrainingTime)
+
         rewardOfTrainingTime = maxTrainingTime
         rewardOfTrainingTime -= self.ClassicFLTrainingTime
-        rewardOfTrainingTime /= 5
+        rewardOfTrainingTime /= 1200
         rewardOfTrainingTime *= -1
 
         rewardOfTrainingTime = min(max(rewardOfTrainingTime, -1), 1)
 
         rewardOfEnergy = averageEnergyConsumption
         rewardOfEnergy -= self.ClassicFLEnergy
-        rewardOfEnergy /= 100
+        rewardOfEnergy /= 10
         rewardOfEnergy *= -1
 
         rewardOfEnergy = min(max(rewardOfEnergy, -1), 1)
@@ -157,30 +194,62 @@ class CustomEnvironment(Environment):
         else:
             raise Exception("Fraction must be less than 1")
 
-        logger.info("-------------------------------------------")
-        logger.info(f"Offloading layer : {offloadingPointsList} \n")
-        logger.info(f"Avg Energy : {averageEnergyConsumption} \n")
-        logger.info(f"Training time : {maxTrainingTime} \n")
-        logger.info(f"Bandwidth : {maxTrainingTime} \n")
-        logger.info(f"Reward of this action : {reward} \n")
-        logger.info(f"Reward of energy : {self.fraction * rewardOfEnergy} \n")
-        logger.info(f"Reward of training time : {(1 - self.fraction) * rewardOfTrainingTime} \n")
-        logger.info(f"IOTs Capacities : {iotRemainingFLOP} \n")
-        logger.info(f"Edges Capacities : {edgeRemainingFLOP} \n")
-        logger.info(f"Cloud Capacities : {cloudRemainingFLOP} \n")
-
+        # logger.info("-------------------------------------------")
+        # logger.info(f"Offloading layer : {offloadingPointsList} \n")
+        # logger.info(f"Avg Energy : {averageEnergyConsumption} \n")
+        # logger.info(f"Training time : {maxTrainingTime} \n")
+        # logger.info(f"Bandwidth : {self.getBandwidth()} \n")
+        # logger.info(f"Reward of this action : {reward} \n")
+        # logger.info(f"Reward of energy : {self.fraction * rewardOfEnergy} \n")
+        # logger.info(f"Reward of training time : {(1 - self.fraction) * rewardOfTrainingTime} \n")
+        # logger.info(f"IOTs Capacities : {iotRemainingFLOP} \n")
+        # logger.info(f"Edges Capacities : {edgeRemainingFLOP} \n")
+        # logger.info(f"Cloud Capacities : {cloudRemainingFLOP} \n")
+        newState = [self.getCumulativeEnergy(), self.getCumulativeTT()]
+        newBW = []
         iotBandwidths = []
-        for iotDevice in self.iotDevices:
-            iotBandwidths.append(np.random.uniform(low=iotDevice.bandwidth * 0.5, high=iotDevice.bandwidth))
-
         edgeBandwidths = []
+        for iotDevice in self.iotDevices:
+            iotBandwidths.append(random.uniform(iotDevice.bandwidth * 0.1, iotDevice.bandwidth * 1.0))
         for edgeDevice in self.edgeDevices:
-            edgeBandwidths.append(np.random.uniform(low=edgeDevice.bandwidth * 0.5, high=edgeDevice.bandwidth))
-        newState = np.concatenate((iotBandwidths,edgeBandwidths),axis=0)
-        self.setBandwidth(newState)
+            edgeBandwidths.append(random.uniform(edgeDevice.bandwidth * 0.1, edgeDevice.bandwidth * 1.0))
+
+        # edgeBandwidths.append(edgeDevice.bandwidth * 1.0)
+        # iotBandwidths.append(iotDevice.bandwidth * 1.0)
+        # if self.getCurrentTimestep() < 50:
+        #     for iotDevice in self.iotDevices:
+        #         iotBandwidths.append(iotDevice.bandwidth * 1.0)
+        #
+        #     for edgeDevice in self.edgeDevices:
+        #         edgeBandwidths.append(edgeDevice.bandwidth * 1.0)
+        # elif 50 < self.getCurrentTimestep() < 100:
+        #     for iotDevice in self.iotDevices:
+        #         iotBandwidths.append(iotDevice.bandwidth * 2.0)
+        #
+        #     for edgeDevice in self.edgeDevices:
+        #         edgeBandwidths.append(edgeDevice.bandwidth * 2.0)
+        # elif 100 < self.getCurrentTimestep() < 150:
+        #     for iotDevice in self.iotDevices:
+        #         iotBandwidths.append(iotDevice.bandwidth * 3.0)
+        #
+        #     for edgeDevice in self.edgeDevices:
+        #         edgeBandwidths.append(edgeDevice.bandwidth * 3.0)
+        # else:
+        #     for iotDevice in self.iotDevices:
+        #         iotBandwidths.append(iotDevice.bandwidth * 4.0)
+        #
+        #     for edgeDevice in self.edgeDevices:
+        #         edgeBandwidths.append(edgeDevice.bandwidth * 4.0)
+
+        newBW = np.concatenate((iotBandwidths, edgeBandwidths), axis=0)
+
+        newState = np.concatenate((newState, iotBandwidths, edgeBandwidths, action), axis=0)
+        self.setBandwidth(newBW)
+
         return reward, newState
 
     def execute(self, actions: list):
+        self.timestep += 1
         terminal = False
         reward, newState = self.rewardFun(actions)
         return newState, terminal, reward

@@ -10,7 +10,7 @@ def create(fraction, environment, timestepNum, saveSummariesPath):
         # Reward estimation
         reward_estimation=dict(
             horizon=1,
-            discount=0.96,
+            discount=0.99,
         ),
 
         # Preprocessing
@@ -20,9 +20,9 @@ def create(fraction, environment, timestepNum, saveSummariesPath):
         optimizer=dict(
             optimizer='adam',
             learning_rate=0.003,
-            clipping_threshold=0.1,
-            multi_step=5,
-            subsampling_fraction=0.99
+            clipping_threshold=0.5,
+            multi_step=1,
+            subsampling_fraction=0.70
         ),
 
         update=dict(
@@ -59,10 +59,12 @@ def create(fraction, environment, timestepNum, saveSummariesPath):
                         labels='all',
                         ),
         recorder=None,
-
+        # saver=dict(
+        #     directory=f"/home/alireza_soleymani/UniversityWorks/Thesis/FedSplitting-RL/Tensorforce/agent/tf_agent_1_1_1/{fraction}/",
+        #     frequency=30),
         # Config
         config=dict(name='agent',
-                    device="GPU",
+                    device="CPU",
                     parallel_interactions=1,
                     seed=None,
                     execution=None,
