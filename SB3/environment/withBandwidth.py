@@ -42,8 +42,13 @@ class CustomEnv(gym.Env):
         self.trainingTimeOfComputation = 0
         self.trainingTimeOfCommunication = 0
 
+        self.timestep_energy = []
+        self.timestep_tt = []
+        self.timestep_reward = []
+
         self.episode_energy = []
         self.episode_tt = []
+        self.episode_reward = []
 
         self.effectiveBandwidth = []
 
@@ -153,8 +158,10 @@ class CustomEnv(gym.Env):
         else:
             raise Exception("Fraction must be less than 1")
 
-        self.episode_energy.append(averageEnergyConsumption)
-        self.episode_tt.append(maxTrainingTime)
+        self.timestep_energy.append(averageEnergyConsumption)
+        self.timestep_tt.append(maxTrainingTime)
+        self.timestep_reward.append(reward)
+
         logger.info("-------------------------------------------")
         logger.info(f"Offloading layer : {offloadingPointsList} \n")
         logger.info(f"Avg Energy : {averageEnergyConsumption} \n")
@@ -221,6 +228,13 @@ class CustomEnv(gym.Env):
         self.timestep = 0
         self.current_step = 0
         self.num_resets += 1
+
+        self.episode_energy.append(sum(self.timestep_energy) / self.ep_length)
+        self.episode_tt.append(sum(self.timestep_tt) / self.ep_length)
+        self.episode_reward.append(sum(self.timestep_reward)/self.ep_length)
+        self.timestep_tt = []
+        self.timestep_energy = []
+        self.timestep_reward = []
 
         self.setCumulativeEnergy(0)
         self.setCumulativeTT(0)
