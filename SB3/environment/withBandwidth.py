@@ -1,8 +1,9 @@
 import logging
 import random
 
+import gymnasium as gym
 import numpy as np
-from tensorforce import Environment
+from gymnasium import spaces
 
 import Tensorforce.config as config
 from Tensorforce import utils
@@ -11,12 +12,12 @@ from entities.Device_bandwidthState import Device
 logger = logging.getLogger()
 
 
-class CustomEnvironment(Environment):
+class CustomEnv(gym.Env):
+    """Custom Environment that follows gym interface."""
 
     def __init__(self, rewardTuningParams, iotDevices: list, edgeDevices: list, cloud: Device,
-                 fraction=0.8):
+                 fraction=0.8, ep_length: int = 100):
         super().__init__()
-
         self.iotDeviceNum: int = len(iotDevices)
         self.edgeDeviceNum: int = len(edgeDevices)
 
@@ -41,68 +42,26 @@ class CustomEnvironment(Environment):
         self.trainingTimeOfComputation = 0
         self.trainingTimeOfCommunication = 0
 
+        self.episode_energy = []
+        self.episode_tt = []
+
         self.effectiveBandwidth = []
 
+        self.ep_length = ep_length
+        self.current_step = 0
+        self.num_resets = -1  # Becomes 0 after __init__ exits.
+
         self.fraction = fraction
-
-    def states(self):
-        # State = [ Culmulative Energy, Cumulative training time, Bandwidth of each client, bandwidth of each edge, MaxTrainingTime, EnergyConsumption, prevAction]
-        return dict(type="float", shape=(2 + self.iotDeviceNum + self.edgeDeviceNum + 2 * self.iotDeviceNum,),
-                    min_value=0, max_value=1000000)
-
-    def actions(self):
-        return dict(type="float", shape=(self.iotDeviceNum * 2,), min_value=0.0, max_value=1.0)
-
-    def setBandwidth(self, bandwidth: list):
-        self.effectiveBandwidth = bandwidth
-
-    def getBandwidth(self):
-        return self.effectiveBandwidth
-
-    def setCumulativeEnergy(self, energy):
-        self.cumulativeEnergy = energy
-
-    def getCumulativeEnergy(self):
-        return self.cumulativeEnergy
-
-    def setCumulativeTT(self, TT):
-        self.cumulativeTT = TT
-
-    def getCumulativeTT(self):
-        return self.cumulativeTT
-
-    def setCurrentTimestep(self, ts):
-        self.currentTimestep = ts
-
-    def getCurrentTimestep(self):
-        return self.currentTimestep
-
-    def max_episode_timesteps(self):
-        return super().max_episode_timesteps()
-
-    def close(self):
-        super().close()
-
-    def reset(self):
-        self.timestep = 0
-        self.setCumulativeEnergy(0)
-        self.setCumulativeTT(0)
-
-        # randActions = np.random.uniform(low=0.0, high=1.0, size=(self.iotDeviceNum * 2))
-        randActions = [config.LAYER_NUM - 1] * 2 * self.iotDeviceNum
-        iotBandwidths = []
-        for iotDevice in self.iotDevices:
-            iotBandwidths.append(np.random.uniform(low=iotDevice.bandwidth * 1.0, high=iotDevice.bandwidth))
-
-        edgeBandwidths = []
-        for edgeDevice in self.edgeDevices:
-            edgeBandwidths.append(np.random.uniform(low=edgeDevice.bandwidth * 1.0, high=edgeDevice.bandwidth))
-
-        self.setBandwidth(bandwidth=np.concatenate((iotBandwidths, edgeBandwidths), axis=0))
-
-        reward, newState = self.rewardFun(randActions)
-
-        return np.concatenate((newState[:2], self.getBandwidth(), randActions), axis=0)
+        # Define action and observation space
+        # They must be gym.spaces objects
+        # Example when using discrete actions:
+        self.action_space = spaces.Box(low=0.0, high=1.0,
+                                       shape=(self.iotDeviceNum * 2,),
+                                       dtype=np.float32)
+        # Example for using image as input (channel-first; channel-last also works):
+        self.observation_space = spaces.Box(low=0, high=1000000,
+                                            shape=(2 + self.iotDeviceNum + self.edgeDeviceNum + 2 * self.iotDeviceNum,),
+                                            dtype=np.float32)
 
     def rewardFun(self, action):
         allTrainingTimes = []
@@ -194,14 +153,16 @@ class CustomEnvironment(Environment):
         else:
             raise Exception("Fraction must be less than 1")
 
-        # logger.info("-------------------------------------------")
-        # logger.info(f"Offloading layer : {offloadingPointsList} \n")
-        # logger.info(f"Avg Energy : {averageEnergyConsumption} \n")
-        # logger.info(f"Training time : {maxTrainingTime} \n")
-        # logger.info(f"Bandwidth : {self.getBandwidth()} \n")
-        # logger.info(f"Reward of this action : {reward} \n")
-        # logger.info(f"Reward of energy : {self.fraction * rewardOfEnergy} \n")
-        # logger.info(f"Reward of training time : {(1 - self.fraction) * rewardOfTrainingTime} \n")
+        self.episode_energy.append(averageEnergyConsumption)
+        self.episode_tt.append(maxTrainingTime)
+        logger.info("-------------------------------------------")
+        logger.info(f"Offloading layer : {offloadingPointsList} \n")
+        logger.info(f"Avg Energy : {averageEnergyConsumption} \n")
+        logger.info(f"Training time : {maxTrainingTime} \n")
+        logger.info(f"Bandwidth : {self.getBandwidth()} \n")
+        logger.info(f"Reward of this action : {reward} \n")
+        logger.info(f"Reward of energy : {self.fraction * rewardOfEnergy} \n")
+        logger.info(f"Reward of training time : {(1 - self.fraction) * rewardOfTrainingTime} \n")
         # logger.info(f"IOTs Capacities : {iotRemainingFLOP} \n")
         # logger.info(f"Edges Capacities : {edgeRemainingFLOP} \n")
         # logger.info(f"Cloud Capacities : {cloudRemainingFLOP} \n")
@@ -248,8 +209,64 @@ class CustomEnvironment(Environment):
 
         return reward, newState
 
-    def execute(self, actions: list):
+    def step(self, action):
         self.timestep += 1
-        terminal = False
-        reward, newState = self.rewardFun(actions)
-        return newState, terminal, reward
+        terminated = False
+        reward, observation = self.rewardFun(action)
+        self.current_step += 1
+        truncated = self.current_step >= self.ep_length
+        return observation, reward, terminated, truncated, {}
+
+    def reset(self, seed=None, options=None):
+        self.timestep = 0
+        self.current_step = 0
+        self.num_resets += 1
+
+        self.setCumulativeEnergy(0)
+        self.setCumulativeTT(0)
+
+        # randActions = np.random.uniform(low=0.0, high=1.0, size=(self.iotDeviceNum * 2))
+        randActions = [config.LAYER_NUM - 1] * 2 * self.iotDeviceNum
+        iotBandwidths = []
+        for iotDevice in self.iotDevices:
+            iotBandwidths.append(np.random.uniform(low=iotDevice.bandwidth * 1.0, high=iotDevice.bandwidth))
+
+        edgeBandwidths = []
+        for edgeDevice in self.edgeDevices:
+            edgeBandwidths.append(np.random.uniform(low=edgeDevice.bandwidth * 1.0, high=edgeDevice.bandwidth))
+
+        self.setBandwidth(bandwidth=np.concatenate((iotBandwidths, edgeBandwidths), axis=0))
+
+        reward, observation = self.rewardFun(randActions)
+
+        return observation, {}
+
+    def render(self):
+        pass
+
+    def close(self):
+        super().close()
+
+    def setBandwidth(self, bandwidth: list):
+        self.effectiveBandwidth = bandwidth
+
+    def getBandwidth(self):
+        return self.effectiveBandwidth
+
+    def setCumulativeEnergy(self, energy):
+        self.cumulativeEnergy = energy
+
+    def getCumulativeEnergy(self):
+        return self.cumulativeEnergy
+
+    def setCumulativeTT(self, TT):
+        self.cumulativeTT = TT
+
+    def getCumulativeTT(self):
+        return self.cumulativeTT
+
+    def setCurrentTimestep(self, ts):
+        self.currentTimestep = ts
+
+    def getCurrentTimestep(self):
+        return self.currentTimestep
