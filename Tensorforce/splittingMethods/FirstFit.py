@@ -4,7 +4,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 import entities.Device as Device
-import Tensorforce.config as conf
+import config as conf
 
 
 class FirstFit:

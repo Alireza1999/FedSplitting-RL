@@ -1,6 +1,6 @@
 import logging
 
-import Tensorforce.config as config
+import config as config
 
 logger = logging.getLogger()
 
@@ -43,7 +43,8 @@ class Device:
             elif self.deviceType == 'edge':
                 compWorkLoad = sum(config.COMP_WORK_LOAD[splitPoints[0] + 1:splitPoints[1] + 1])
                 if self.connectedDevice != 0:
-                    computationTime = numOfBatch * sum(config.COMP_TIME_OF_LAYERS_edges[splitPoints[0] + 1:splitPoints[1] + 1])
+                    computationTime = numOfBatch * sum(
+                        config.COMP_TIME_OF_LAYERS_edges[splitPoints[0] + 1:splitPoints[1] + 1])
 
                 # if remainingFlops < 0 and (splitPoints[1] != splitPoints[2]):
                 #     computationTime *= (1 + abs(remainingFlops) / 100)

@@ -3,8 +3,8 @@ import logging
 from tensorforce import Environment
 
 from entities.Device import Device
-from Tensorforce import config as conf
 from Tensorforce import utils
+import config as conf
 from Tensorforce.enviroments import customEnv
 
 

@@ -4,7 +4,7 @@ import random
 import numpy as np
 from tensorforce import Environment
 
-import Tensorforce.config as config
+import config as config
 from Tensorforce import utils
 from entities.Device_bandwidthState import Device
 

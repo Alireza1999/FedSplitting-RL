@@ -1,5 +1,4 @@
-from Tensorforce import config
-import numpy as np
+import config
 
 
 class NoSplitting:

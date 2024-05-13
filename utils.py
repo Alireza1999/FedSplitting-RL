@@ -8,11 +8,7 @@ import numpy as np
 import plotly.graph_objects as go
 
 import config
-from Tensorforce.enviroments import customEnv_bandwidthState, customEnv, customEnvNoEdge, fedAdaptEnv
-from Tensorforce.splittingMethods import FirstFit, PPO, TRPO, RandomAgent, NoSplitting, TensorforceAgent, AC, tunerAgent
 from entities.Device_bandwidthState import Device as Device
-
-
 # from entities.Device import Device
 
 
@@ -355,57 +351,6 @@ def minMaxAvgEnergy(iotDevices, edgeDevices, cloud):
     print(f"Max Energy Splitting : {maxEnergySplitting}\nMin Energy Splitting : {minEnergySplitting}")
     print(f"Max Energy Training Time : {maxEnergyTrainingTime}\nMin Energy Training Time : {minEnergyTrainingTime}")
     return maxAvgEnergy, minAvgEnergy
-
-
-def createEnv(iotDevices, edgeDevices, cloud, fraction, rewardTuningParams,
-              envType=None, groupNum=1):
-    if envType == 'default':
-        return customEnv.CustomEnvironment(rewardTuningParams=rewardTuningParams, iotDevices=iotDevices,
-                                           edgeDevices=edgeDevices, cloud=cloud, fraction=fraction)
-    elif envType == "fedAdapt":
-        return fedAdaptEnv.FedAdaptEnv(allTrainingTime=rewardTuningParams,
-                                       iotDevices=iotDevices,
-                                       cloud=cloud,
-                                       groupNum=groupNum)
-    elif envType == "defaultNoEdge":
-        return customEnvNoEdge.CustomEnvironmentNoEdge(rewardTuningParams=rewardTuningParams,
-                                                       iotDevices=iotDevices,
-                                                       cloud=cloud)
-    elif envType == "defaultWithBandwidth":
-        return customEnv_bandwidthState.CustomEnvironment(rewardTuningParams=rewardTuningParams,
-                                                          iotDevices=iotDevices,
-                                                          edgeDevices=edgeDevices,
-                                                          cloud=cloud,
-                                                          fraction=fraction)
-    else:
-        raise "Invalid Environment Parameter. Valid option : default, fedAdapt, defaultNoEdge"
-
-
-def createAgent(agentType, fraction, timestepNum, environment, saveSummariesPath, iotDevices=None, edgeDevices=None,
-                cloud=None):
-    if agentType == 'ppo':
-        return PPO.create(fraction=fraction, environment=environment, timestepNum=timestepNum,
-                          saveSummariesPath=saveSummariesPath)
-    elif agentType == 'ac':
-        return AC.create(fraction=fraction, environment=environment, timestepNum=timestepNum,
-                         saveSummariesPath=saveSummariesPath)
-    elif agentType == 'tensorforce':
-        return TensorforceAgent.create(fraction=fraction, environment=environment,
-                                       timestepNum=timestepNum, saveSummariesPath=saveSummariesPath)
-    elif agentType == 'trpo':
-        return TRPO.create(fraction=fraction, environment=environment,
-                           timestepNum=timestepNum, saveSummariesPath=saveSummariesPath)
-    elif agentType == 'random':
-        return RandomAgent.RandomAgent(environment=environment)
-    elif agentType == 'noSplitting':
-        return NoSplitting.NoSplitting(environment=environment)
-    elif agentType == 'firstFit':
-        return FirstFit.FirstFit(iotDevices=iotDevices, edgeDevices=edgeDevices, cloud=cloud)
-    if agentType == 'tuner':
-        return tunerAgent.create(fraction=fraction, environment=environment, timestepNum=timestepNum,
-                                 saveSummariesPath=saveSummariesPath)
-    else:
-        raise Exception('Invalid config select from [ppo, ac, tensorforce, random]')
 
 
 def createLog(fileName):

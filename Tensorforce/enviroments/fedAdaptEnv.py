@@ -2,7 +2,7 @@ import logging
 
 from tensorforce import Environment
 
-import Tensorforce.config as config
+import config as config
 from entities.Device import Device
 from Tensorforce import utils
 

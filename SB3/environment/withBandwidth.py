@@ -5,7 +5,7 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
-import Tensorforce.config as config
+import config as config
 from Tensorforce import utils
 from entities.Device_bandwidthState import Device
 

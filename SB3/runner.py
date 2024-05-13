@@ -3,7 +3,7 @@ import sys
 sys.path.append("/home/alireza_soleymani/UniversityWorks/Thesis/FedSplitting-RL/")
 
 from stable_baselines3 import A2C
-import Tensorforce.utils as utils
+import utils
 
 agent = 'AC'
 fractions = 1.0
@@ -13,12 +13,12 @@ episode_len = 100
 logger = utils.createLog(fileName=f"SB3_{agent}_{fractions}")
 
 from SB3.environment.withBandwidth import CustomEnv
-from Tensorforce import utils
 
 iotDevices = utils.createDeviceFromCSV(csvFilePath="../envs_stats/iotDevices.csv",
                                        deviceType='iotDevice')
 edgeDevices = utils.createDeviceFromCSV(csvFilePath="../envs_stats/edges.csv")
 cloud = utils.createDeviceFromCSV(csvFilePath="../envs_stats/cloud.csv")[0]
+
 FLEnergy, FLTrainingTime = utils.ClassicFLTrainingTime(iotDevices, edgeDevices, cloud)
 
 rewardTuningParams = [FLEnergy, FLTrainingTime]

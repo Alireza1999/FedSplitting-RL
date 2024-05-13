@@ -1,7 +1,7 @@
 import logging
 import random
 import numpy as np
-import Tensorforce.config as config
+import config as config
 
 logger = logging.getLogger()
 

@@ -3,7 +3,7 @@ import logging
 import numpy as np
 from tensorforce import Environment
 
-import Tensorforce.config as config
+import config as config
 from entities.Device import Device
 from Tensorforce import utils
 
