@@ -6,7 +6,7 @@ import numpy as np
 from gymnasium import spaces
 
 import config as config
-from Tensorforce import utils
+import utils
 from entities.Device_bandwidthState import Device
 
 logger = logging.getLogger()
