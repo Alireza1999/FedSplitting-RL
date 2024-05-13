@@ -1,33 +1,38 @@
 import sys
-
-sys.path.append("/home/alireza_soleymani/UniversityWorks/Thesis/FedSplitting-RL/")
+import os
+from pathlib import Path
+ROOT_DIR = Path.cwd().parent
+sys.path.append(f"{ROOT_DIR}")
 
 from stable_baselines3 import A2C
 import utils
+
 
 agent = 'AC'
 fractions = 1.0
 total_time_step = 1000
 episode_len = 100
 
-logger = utils.createLog(fileName=f"SB3_{agent}_{fractions}")
+logger = utils.createLog(fileName=f"SB3/Logs/SB3_{agent}_{fractions}")
 
 from SB3.environment.withBandwidth import CustomEnv
 
-iotDevices = utils.createDeviceFromCSV(csvFilePath="../envs_stats/iotDevices.csv",
+iotDevices = utils.createDeviceFromCSV(csvFilePath=f"{ROOT_DIR}/envs_stats/iotDevices.csv",
                                        deviceType='iotDevice')
-edgeDevices = utils.createDeviceFromCSV(csvFilePath="../envs_stats/edges.csv")
-cloud = utils.createDeviceFromCSV(csvFilePath="../envs_stats/cloud.csv")[0]
+edgeDevices = utils.createDeviceFromCSV(csvFilePath=f"{ROOT_DIR}/envs_stats/edges.csv")
+cloud = utils.createDeviceFromCSV(csvFilePath=f"{ROOT_DIR}/envs_stats/cloud.csv")[0]
 
 FLEnergy, FLTrainingTime = utils.ClassicFLTrainingTime(iotDevices, edgeDevices, cloud)
 
 rewardTuningParams = [FLEnergy, FLTrainingTime]
+print(f"Energy of ClssicFL: {FLEnergy}")
+print(f"TrainingIme of Clasic FL: {FLTrainingTime}")
 env = CustomEnv(rewardTuningParams, iotDevices, edgeDevices, cloud, fraction=1.0, ep_length=episode_len)
 
 model = A2C("MlpPolicy", env, verbose=1, device="cpu", learning_rate=0.00007)
 model.learn(total_timesteps=total_time_step)
 
-saveGraphPath = f"Graphs/bandwidth/{agent}/{fractions}/"
+saveGraphPath = f"{ROOT_DIR}/SB3/Graphs/bandwidth/{agent}/{fractions}/"
 x = [i for i in range(int(total_time_step / episode_len))]
 utils.draw_graph(title="Reward vs Episode",
                  xlabel="Episode",

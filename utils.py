@@ -353,8 +353,11 @@ def minMaxAvgEnergy(iotDevices, edgeDevices, cloud):
     return maxAvgEnergy, minAvgEnergy
 
 
+
 def createLog(fileName):
-    logging.basicConfig(filename=f"./Logs/{fileName}.log",
+    from SB3.runner import ROOT_DIR
+
+    logging.basicConfig(filename=f"{ROOT_DIR}/{fileName}.log",
                         format='%(message)s',
                         filemode='w')
     logger = logging.getLogger()
@@ -457,3 +460,4 @@ def preTrain(iotDevices, edgeDevices, cloud):
             max_trainingtime_splitting = splittingArray
             max_trainingTime_energy = avgEnergy
     return rewardTuningParams
+
