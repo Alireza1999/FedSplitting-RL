@@ -60,11 +60,11 @@ class CustomEnv(gym.Env):
         # Define action and observation space
         # They must be gym.spaces objects
         # Example when using discrete actions:
-        self.action_space = spaces.Box(low=0.0, high=1.0,
+        self.action_space = spaces.Box(low=-1.0, high=1.0,
                                        shape=(self.iotDeviceNum * 2,),
                                        dtype=np.float32)
         # Example for using image as input (channel-first; channel-last also works):
-        self.observation_space = spaces.Box(low=0, high=1000000,
+        self.observation_space = spaces.Box(low=0, high=100,
                                             shape=(2 + self.iotDeviceNum + self.edgeDeviceNum + 2 * self.iotDeviceNum,),
                                             dtype=np.float32)
 
@@ -131,8 +131,8 @@ class CustomEnv(gym.Env):
         totalEnergyConsumption = (total_comm_e + total_comp_e)
         averageEnergyConsumption = totalEnergyConsumption / self.iotDeviceNum
 
-        self.setCumulativeEnergy(self.getCumulativeEnergy() + averageEnergyConsumption)
-        self.setCumulativeTT(self.getCumulativeTT() + maxTrainingTime)
+        normalizedAvgEnergy= averageEnergyConsumption / self.ClassicFLEnergy
+        normalizedTT = maxTrainingTime / self.ClassicFLTrainingTime
 
         rewardOfTrainingTime = maxTrainingTime
         rewardOfTrainingTime -= self.ClassicFLTrainingTime
@@ -170,11 +170,7 @@ class CustomEnv(gym.Env):
         logger.info(f"Reward of this action : {reward} \n")
         logger.info(f"Reward of energy : {self.fraction * rewardOfEnergy} \n")
         logger.info(f"Reward of training time : {(1 - self.fraction) * rewardOfTrainingTime} \n")
-        # logger.info(f"IOTs Capacities : {iotRemainingFLOP} \n")
-        # logger.info(f"Edges Capacities : {edgeRemainingFLOP} \n")
-        # logger.info(f"Cloud Capacities : {cloudRemainingFLOP} \n")
-        newState = [self.getCumulativeEnergy(), self.getCumulativeTT()]
-        newBW = []
+
         iotBandwidths = []
         edgeBandwidths = []
         for iotDevice in self.iotDevices:
@@ -210,9 +206,11 @@ class CustomEnv(gym.Env):
         #         edgeBandwidths.append(edgeDevice.bandwidth * 4.0)
 
         newBW = np.concatenate((iotBandwidths, edgeBandwidths), axis=0)
-
-        newState = np.concatenate((newState, iotBandwidths, edgeBandwidths, action), axis=0)
         self.setBandwidth(newBW)
+
+        newState = [normalizedAvgEnergy, normalizedTT]
+        newState = np.concatenate((newState, iotBandwidths, edgeBandwidths, action), axis=0)
+        logger.info(f"New State: {newState}")
 
         return reward, newState
 
@@ -231,7 +229,7 @@ class CustomEnv(gym.Env):
 
         self.episode_energy.append(sum(self.timestep_energy) / self.ep_length)
         self.episode_tt.append(sum(self.timestep_tt) / self.ep_length)
-        self.episode_reward.append(sum(self.timestep_reward)/self.ep_length)
+        self.episode_reward.append(sum(self.timestep_reward) / self.ep_length)
         self.timestep_tt = []
         self.timestep_energy = []
         self.timestep_reward = []
@@ -240,7 +238,7 @@ class CustomEnv(gym.Env):
         self.setCumulativeTT(0)
 
         # randActions = np.random.uniform(low=0.0, high=1.0, size=(self.iotDeviceNum * 2))
-        randActions = [config.LAYER_NUM - 1] * 2 * self.iotDeviceNum
+        randActions = [1.0] * 2 * self.iotDeviceNum
         iotBandwidths = []
         for iotDevice in self.iotDevices:
             iotBandwidths.append(np.random.uniform(low=iotDevice.bandwidth * 1.0, high=iotDevice.bandwidth))

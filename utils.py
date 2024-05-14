@@ -9,6 +9,8 @@ import plotly.graph_objects as go
 
 import config
 from entities.Device_bandwidthState import Device as Device
+
+
 # from entities.Device import Device
 
 
@@ -87,7 +89,7 @@ def draw_3dGraph(x, y, z, xlabel, ylabel, zlabel):
 
 
 def actionToLayer(splitDecision: list) -> tuple:
-    """ It returns the offloading points for the given action ( op1 , op2 )"""
+    """ It returns the offloading points for the given action ( op1 , op2 ), split decision can be between -1 to 1"""
     if splitDecision[0] >= 0.96:
         return 6, 6
     else:
@@ -102,7 +104,8 @@ def actionToLayer(splitDecision: list) -> tuple:
 
         totalWorkLoad = sum(workLoad)
         model_flops_list = np.array(model_state_flops)
-        model_flops_list = model_flops_list / totalWorkLoad
+        model_flops_list = ((model_flops_list / totalWorkLoad)*2)-1
+
         idx = np.where(np.abs(model_flops_list - splitDecision[0]) == np.abs(model_flops_list - splitDecision[0]).min())
         op1 = int(idx[0][-1])
 
@@ -353,7 +356,6 @@ def minMaxAvgEnergy(iotDevices, edgeDevices, cloud):
     return maxAvgEnergy, minAvgEnergy
 
 
-
 def createLog(fileName):
     from SB3.runner import ROOT_DIR
 
@@ -460,4 +462,3 @@ def preTrain(iotDevices, edgeDevices, cloud):
             max_trainingtime_splitting = splittingArray
             max_trainingTime_energy = avgEnergy
     return rewardTuningParams
-

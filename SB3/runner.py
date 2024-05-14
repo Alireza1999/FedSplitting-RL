@@ -10,7 +10,7 @@ import utils
 
 agent = 'AC'
 fractions = 1.0
-total_time_step = 1000
+total_time_step = 100000
 episode_len = 100
 
 logger = utils.createLog(fileName=f"SB3/Logs/SB3_{agent}_{fractions}")
@@ -29,8 +29,18 @@ print(f"Energy of ClssicFL: {FLEnergy}")
 print(f"TrainingIme of Clasic FL: {FLTrainingTime}")
 env = CustomEnv(rewardTuningParams, iotDevices, edgeDevices, cloud, fraction=1.0, ep_length=episode_len)
 
-model = A2C("MlpPolicy", env, verbose=1, device="cpu", learning_rate=0.00007)
+model = A2C("MlpPolicy", env, verbose=1, device="auto", learning_rate=0.00007)
 model.learn(total_timesteps=total_time_step)
+model.save(f"{ROOT_DIR}/SB3/models/{agent}_{fractions}")
+
+# model = A2C.load(f"{ROOT_DIR}/SB3/models/{agent}_{fractions}", env=env)
+# print(model.get_parameters())
+
+# Evaluate the trained agent
+# mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=100, deterministic=True)
+# print(f"mean_reward={mean_reward:.2f} +/- {std_reward}")
+# x = [i for i in range(100)]
+
 
 saveGraphPath = f"{ROOT_DIR}/SB3/Graphs/bandwidth/{agent}/{fractions}/"
 x = [i for i in range(int(total_time_step / episode_len))]
