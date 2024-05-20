@@ -9,6 +9,7 @@ import plotly.graph_objects as go
 
 import config
 from entities.Device_bandwidthState import Device as Device
+from typing import Callable
 
 
 # from entities.Device import Device
@@ -366,6 +367,28 @@ def createLog(fileName):
     logger.setLevel(logging.DEBUG)
     return logger
 
+
+# this function changes Learning Rate of agent depends on the remaining round, decrease the LR with passing time
+# USED IN STABLE-BASELINE 3
+def linear_schedule(initial_value: float) -> Callable[[float], float]:
+    """
+    Linear learning rate schedule.
+
+    :param initial_value: Initial learning rate.
+    :return: schedule that computes
+      current learning rate depending on remaining progress
+    """
+
+    def func(progress_remaining: float) -> float:
+        """
+        Progress will decrease from 1 (beginning) to 0.
+
+        :param progress_remaining:
+        :return: current learning rate
+        """
+        return progress_remaining * initial_value
+
+    return func
 
 def preTrainEnv(iotDevices: list, edgeDevices: list, cloud: Device, action) -> tuple:
     edgesConnectedDeviceNum = [0] * len(edgeDevices)

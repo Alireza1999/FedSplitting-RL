@@ -29,7 +29,7 @@ class CustomEnv(gym.Env):
         self.ClassicFLTrainingTime = rewardTuningParams[1]
 
         self.currentTimestep = 0
-
+        self.currentEpisode = 0
         self.cumulativeEnergy = 0
         self.cumulativeTT = 0
 
@@ -64,7 +64,7 @@ class CustomEnv(gym.Env):
                                        shape=(self.iotDeviceNum * 2,),
                                        dtype=np.float32)
         # Example for using image as input (channel-first; channel-last also works):
-        self.observation_space = spaces.Box(low=0, high=100,
+        self.observation_space = spaces.Box(low=-50.0, high=100,
                                             shape=(2 + self.iotDeviceNum + self.edgeDeviceNum + 2 * self.iotDeviceNum,),
                                             dtype=np.float32)
 
@@ -131,7 +131,7 @@ class CustomEnv(gym.Env):
         totalEnergyConsumption = (total_comm_e + total_comp_e)
         averageEnergyConsumption = totalEnergyConsumption / self.iotDeviceNum
 
-        normalizedAvgEnergy= averageEnergyConsumption / self.ClassicFLEnergy
+        normalizedAvgEnergy = averageEnergyConsumption / self.ClassicFLEnergy
         normalizedTT = maxTrainingTime / self.ClassicFLTrainingTime
 
         rewardOfTrainingTime = maxTrainingTime
@@ -173,25 +173,19 @@ class CustomEnv(gym.Env):
 
         iotBandwidths = []
         edgeBandwidths = []
-        for iotDevice in self.iotDevices:
-            iotBandwidths.append(random.uniform(iotDevice.bandwidth * 1.0, iotDevice.bandwidth * 1.0))
-        for edgeDevice in self.edgeDevices:
-            edgeBandwidths.append(random.uniform(edgeDevice.bandwidth * 1.0, edgeDevice.bandwidth * 1.0))
 
-        # edgeBandwidths.append(edgeDevice.bandwidth * 1.0)
-        # iotBandwidths.append(iotDevice.bandwidth * 1.0)
-        # if self.getCurrentTimestep() < 50:
-        #     for iotDevice in self.iotDevices:
-        #         iotBandwidths.append(iotDevice.bandwidth * 1.0)
-        #
-        #     for edgeDevice in self.edgeDevices:
-        #         edgeBandwidths.append(edgeDevice.bandwidth * 1.0)
-        # elif 50 < self.getCurrentTimestep() < 100:
-        #     for iotDevice in self.iotDevices:
-        #         iotBandwidths.append(iotDevice.bandwidth * 2.0)
-        #
-        #     for edgeDevice in self.edgeDevices:
-        #         edgeBandwidths.append(edgeDevice.bandwidth * 2.0)
+        if self.getCurrentTimestep() < 50:
+            for iotDevice in self.iotDevices:
+                iotBandwidths.append(iotDevice.bandwidth * 0.05)
+
+            for edgeDevice in self.edgeDevices:
+                edgeBandwidths.append(edgeDevice.bandwidth * 0.05)
+        elif 50 <= self.getCurrentTimestep() <= 100:
+            for iotDevice in self.iotDevices:
+                iotBandwidths.append(iotDevice.bandwidth * 1.0)
+
+            for edgeDevice in self.edgeDevices:
+                edgeBandwidths.append(edgeDevice.bandwidth * 1.0)
         # elif 100 < self.getCurrentTimestep() < 150:
         #     for iotDevice in self.iotDevices:
         #         iotBandwidths.append(iotDevice.bandwidth * 3.0)
@@ -207,26 +201,24 @@ class CustomEnv(gym.Env):
 
         newBW = np.concatenate((iotBandwidths, edgeBandwidths), axis=0)
         self.setBandwidth(newBW)
-
         newState = [normalizedAvgEnergy, normalizedTT]
         newState = np.concatenate((newState, iotBandwidths, edgeBandwidths, action), axis=0)
         logger.info(f"New State: {newState}")
-
         return reward, newState
 
     def step(self, action):
-        self.timestep += 1
         terminated = False
         reward, observation = self.rewardFun(action)
-        self.current_step += 1
-        truncated = self.current_step >= self.ep_length
+        self.setCurrentTimestep(self.getCurrentTimestep() + 1)
+
+        truncated = self.getCurrentTimestep() >= self.ep_length
         return observation, reward, terminated, truncated, {}
 
     def reset(self, seed=None, options=None):
-        self.timestep = 0
-        self.current_step = 0
+        super().reset(seed=seed)
+        self.currentEpisode += 1
         self.num_resets += 1
-
+        self.setCurrentTimestep(0)
         self.episode_energy.append(sum(self.timestep_energy) / self.ep_length)
         self.episode_tt.append(sum(self.timestep_tt) / self.ep_length)
         self.episode_reward.append(sum(self.timestep_reward) / self.ep_length)

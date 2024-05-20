@@ -1,21 +1,33 @@
 import sys
 import os
 from pathlib import Path
+
 ROOT_DIR = Path.cwd().parent
 sys.path.append(f"{ROOT_DIR}")
 
-from stable_baselines3 import A2C
+from stable_baselines3 import A2C, PPO, SAC
 import utils
 
+from gymnasium.envs.registration import register
+from SB3.environment.withBandwidth import CustomEnv
 
-agent = 'AC'
+# Example for the CartPole environment
+register(
+    # unique identifier for the env `name-version`
+    id="withBandwidth-v0",
+    # path to the class for creating the env
+    # Note: entry_point also accept a class as input (and not only a string)
+    entry_point=CustomEnv,
+    # Max number of steps per episode, using a `TimeLimitWrapper`
+    max_episode_steps=500,
+)
+
+agent = 'PPO'
 fractions = 1.0
-total_time_step = 100000
+total_time_step = 200000
 episode_len = 100
 
 logger = utils.createLog(fileName=f"SB3/Logs/SB3_{agent}_{fractions}")
-
-from SB3.environment.withBandwidth import CustomEnv
 
 iotDevices = utils.createDeviceFromCSV(csvFilePath=f"{ROOT_DIR}/envs_stats/iotDevices.csv",
                                        deviceType='iotDevice')
@@ -27,9 +39,14 @@ FLEnergy, FLTrainingTime = utils.ClassicFLTrainingTime(iotDevices, edgeDevices, 
 rewardTuningParams = [FLEnergy, FLTrainingTime]
 print(f"Energy of ClssicFL: {FLEnergy}")
 print(f"TrainingIme of Clasic FL: {FLTrainingTime}")
+
 env = CustomEnv(rewardTuningParams, iotDevices, edgeDevices, cloud, fraction=1.0, ep_length=episode_len)
 
-model = A2C("MlpPolicy", env, verbose=1, device="auto", learning_rate=0.00007)
+# from stable_baselines3.common.env_checker import check_env
+#
+# print(check_env(env))
+
+model = PPO("MlpPolicy", env, learning_rate=utils.linear_schedule(0.001), verbose=2, device="cuda")
 model.learn(total_timesteps=total_time_step)
 model.save(f"{ROOT_DIR}/SB3/models/{agent}_{fractions}")
 
