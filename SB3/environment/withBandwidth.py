@@ -209,10 +209,12 @@ class CustomEnv(gym.Env):
     def step(self, action):
         terminated = False
         reward, observation = self.rewardFun(action)
-        self.setCurrentTimestep(self.getCurrentTimestep() + 1)
-        print(f"current Time stamp: {self.getCurrentTimestep()}")
         truncated = self.getCurrentTimestep() >= self.ep_length
-        print(f"trancated: {truncated}")
+        if truncated == True:       
+            print(f"current Time stamp: {self.getCurrentTimestep()}")
+            print(f"trancated: {truncated}")
+        
+        self.setCurrentTimestep(self.getCurrentTimestep() + 1)
         return observation, reward, terminated, truncated, {}
 
     def reset(self, seed=None, options=None):
