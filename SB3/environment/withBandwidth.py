@@ -176,10 +176,10 @@ class CustomEnv(gym.Env):
 
         if self.getCurrentTimestep() < 50:
             for iotDevice in self.iotDevices:
-                iotBandwidths.append(iotDevice.bandwidth * 0.05)
+                iotBandwidths.append(iotDevice.bandwidth * 1.0)
 
             for edgeDevice in self.edgeDevices:
-                edgeBandwidths.append(edgeDevice.bandwidth * 0.05)
+                edgeBandwidths.append(edgeDevice.bandwidth * 1.0)
         elif 50 <= self.getCurrentTimestep() <= 100:
             for iotDevice in self.iotDevices:
                 iotBandwidths.append(iotDevice.bandwidth * 1.0)
@@ -209,22 +209,27 @@ class CustomEnv(gym.Env):
     def step(self, action):
         terminated = False
         reward, observation = self.rewardFun(action)
-        truncated = self.getCurrentTimestep() >= self.ep_length
-        if truncated == True:       
-            print(f"current Time stamp: {self.getCurrentTimestep()}")
-            print(f"trancated: {truncated}")
-        
-        self.setCurrentTimestep(self.getCurrentTimestep() + 1)
+        truncated = self.getCurrentTimestep() >= self.ep_length-1
+        #if truncated == True:       
+            # print(f"current Time stamp: {self.getCurrentTimestep()}")
+            # print(f"trancated: {truncated}")
+            # print(f"Current EP: {self.currentEpisode}")
+        if truncated == False:
+            self.setCurrentTimestep(self.getCurrentTimestep() + 1)
         return observation, reward, terminated, truncated, {}
 
-    def reset(self, seed=None, options=None):
+    def reset(self, seed=1, options=None):
         super().reset(seed=seed)
+        if (self.getCurrentTimestep() != self.ep_length-1) and self.currentEpisode !=0:
+            print(f"BE GA RAFTIM. timestep:{self.getCurrentTimestep()} ============================>>>>>")
+        if self.currentEpisode !=0:
+            self.setCurrentTimestep(0)
+            self.episode_energy.append(sum(self.timestep_energy) / self.ep_length)
+            self.episode_tt.append(sum(self.timestep_tt) / self.ep_length)
+            self.episode_reward.append(sum(self.timestep_reward) / self.ep_length)
+ 
         self.currentEpisode += 1
         self.num_resets += 1
-        self.setCurrentTimestep(0)
-        self.episode_energy.append(sum(self.timestep_energy) / self.ep_length)
-        self.episode_tt.append(sum(self.timestep_tt) / self.ep_length)
-        self.episode_reward.append(sum(self.timestep_reward) / self.ep_length)
         self.timestep_tt = []
         self.timestep_energy = []
         self.timestep_reward = []
