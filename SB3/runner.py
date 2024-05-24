@@ -11,17 +11,6 @@ import utils
 from gymnasium.envs.registration import register
 from SB3.environment.withBandwidth import CustomEnv
 
-# Example for the CartPole environment
-register(
-    # unique identifier for the env `name-version`
-    id="withBandwidth-v0",
-    # path to the class for creating the env
-    # Note: entry_point also accept a class as input (and not only a string)
-    entry_point=CustomEnv,
-    # Max number of steps per episode, using a `TimeLimitWrapper`
-    max_episode_steps=500,
-)
-
 agent = 'PPO'
 fractions = 1.0
 total_time_step = 200000
@@ -46,7 +35,7 @@ env = CustomEnv(rewardTuningParams, iotDevices, edgeDevices, cloud, fraction=1.0
 #
 # print(check_env(env))
 
-model = PPO("MlpPolicy", env, learning_rate=utils.linear_schedule(0.001), verbose=2, device="cuda")
+model = PPO("MlpPolicy", env, learning_rate=utils.linear_schedule(0.001), verbose=2, clip_range=0.5, gamma=0.1, batch_size=1000, n_steps=1000,tensorboard_log='/home/soleymani/FedSplitting-RL/SB3/ppo/1.0/' ,device="auto")
 model.learn(total_timesteps=total_time_step)
 model.save(f"{ROOT_DIR}/SB3/models/{agent}_{fractions}")
 
@@ -60,14 +49,14 @@ model.save(f"{ROOT_DIR}/SB3/models/{agent}_{fractions}")
 
 
 saveGraphPath = f"{ROOT_DIR}/SB3/Graphs/bandwidth/{agent}/{fractions}/"
-x = [i for i in range(int(total_time_step / episode_len))]
+x = [i for i in range(len(env.episode_reward))]
 utils.draw_graph(title="Reward vs Episode",
                  xlabel="Episode",
                  ylabel="Reward",
                  figSizeX=10,
                  figSizeY=5,
                  x=x,
-                 y=env.episode_reward[1:],
+                 y=env.episode_reward,
                  savePath=saveGraphPath,
                  pictureName=f"Reward_episode")
 
@@ -77,7 +66,7 @@ utils.draw_graph(title="Avg Energy vs Episode",
                  figSizeX=10,
                  figSizeY=5,
                  x=x,
-                 y=env.episode_energy[1:],
+                 y=env.episode_energy,
                  savePath=saveGraphPath,
                  pictureName=f"Energy_episode")
 
@@ -87,14 +76,14 @@ utils.draw_graph(title="Avg TrainingTime vs Episode",
                  figSizeX=10,
                  figSizeY=5,
                  x=x,
-                 y=env.episode_tt[1:],
+                 y=env.episode_tt,
                  savePath=saveGraphPath,
                  pictureName=f"TrainingTime_episode")
 
 utils.draw_scatter(title="Energy vs TrainingTime",
                    xlabel="Energy",
                    ylabel="TrainingTime",
-                   x=env.episode_energy[1:],
-                   y=env.episode_tt[1:],
+                   x=env.episode_energy,
+                   y=env.episode_tt,
                    savePath=saveGraphPath,
                    pictureName=f"Scatter")
