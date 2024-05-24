@@ -17,7 +17,6 @@ class CustomEnv(gym.Env):
 
     def __init__(self, rewardTuningParams, iotDevices: list, edgeDevices: list, cloud: Device,
                  fraction=0.8, ep_length: int = 100):
-        super().__init__()
         self.iotDeviceNum: int = len(iotDevices)
         self.edgeDeviceNum: int = len(edgeDevices)
 
@@ -27,6 +26,11 @@ class CustomEnv(gym.Env):
 
         self.ClassicFLEnergy = rewardTuningParams[0]
         self.ClassicFLTrainingTime = rewardTuningParams[1]
+        self.currentClassicFLEnergy = 0
+        self.currentClassicFLTrainingTime = 0
+
+        self.currentOffloadingPoint = [config.LAYER_NUM - 1] * self.iotDeviceNum * 2
+        self.currentState = []
 
         self.currentTimestep = 0
         self.currentEpisode = 0
@@ -57,76 +61,84 @@ class CustomEnv(gym.Env):
         self.num_resets = -1  # Becomes 0 after __init__ exits.
 
         self.fraction = fraction
-        # Define action and observation space
-        # They must be gym.spaces objects
-        # Example when using discrete actions:
-        self.action_space = spaces.Box(low=-1.0, high=1.0,
-                                       shape=(self.iotDeviceNum * 2,),
-                                       dtype=np.float32)
-        # Example for using image as input (channel-first; channel-last also works):
-        self.observation_space = spaces.Box(low=-50.0, high=100,
-                                            shape=(2 + self.iotDeviceNum + self.edgeDeviceNum + 2 * self.iotDeviceNum,),
-                                            dtype=np.float32)
+
+        # Each of the 4 devices has 7 possible actions (0-6)
+        action_spec = [2 * config.LAYER_NUM] * self.iotDeviceNum * 2
+        print(f"action spec: {action_spec}")
+        self.action_space = spaces.MultiDiscrete(action_spec)
+
+        self.observation_space = spaces.Dict({
+            'energy': spaces.Box(low=0.0, high=100.0, shape=(1,), dtype=np.float32),
+            'training_time': spaces.Box(low=0.0, high=100.0, shape=(1,), dtype=np.float32),
+            'transmitted_data': spaces.Box(low=0.0, high=100.0, shape=(self.iotDeviceNum,), dtype=np.float32),
+            'offloading_point': spaces.MultiDiscrete([config.LAYER_NUM - 1] * self.iotDeviceNum * 2)
+        })
+
+        super().__init__(ep_length=self.ep_length)
 
     def rewardFun(self, action):
         allTrainingTimes = []
         total_comp_e = 0
         total_comm_e = 0
         edgesConnectedDeviceNum = [0] * self.edgeDeviceNum
+        isValid, updatedOffloadingPoint = self.isActionValid(self.currentOffloadingPoint, action)
 
-        for i in range(0, len(action), 2):
-            self.iotDevices[int(i / 2)].setEffectiveBW(self.effectiveBandwidth[int(i / 2)])
-            self.edgeDevices[self.iotDevices[int(i / 2)].edgeIndex].connectedDevice = 0
-            self.cloud.connectedDevice = 0
+        if not isValid:
+            return -1, self.currentState
+        else:
+            for i in range(0, len(action), 2):
+                self.iotDevices[int(i / 2)].setEffectiveBW(self.effectiveBandwidth[int(i / 2)])
+                self.edgeDevices[self.iotDevices[int(i / 2)].edgeIndex].connectedDevice = 0
+                self.cloud.connectedDevice = 0
 
-        for i in range(self.edgeDeviceNum):
-            self.edgeDevices[i].setEffectiveBW(self.effectiveBandwidth[i + self.iotDeviceNum])
+            for i in range(self.edgeDeviceNum):
+                self.edgeDevices[i].setEffectiveBW(self.effectiveBandwidth[i + self.iotDeviceNum])
 
-        totalEnergyConsumption = 0
-        maxTrainingTime = 0
-        offloadingPointsList = []
+            totalEnergyConsumption = 0
+            maxTrainingTime = 0
+            offloadingPointsList = []
 
-        iotRemainingFLOP = [iot.FLOPS for iot in self.iotDevices]
-        edgeRemainingFLOP = [edge.FLOPS for edge in self.edgeDevices]
-        cloudRemainingFLOP = self.cloud.FLOPS
+            iotRemainingFLOP = [iot.FLOPS for iot in self.iotDevices]
+            edgeRemainingFLOP = [edge.FLOPS for edge in self.edgeDevices]
+            cloudRemainingFLOP = self.cloud.FLOPS
 
-        for i in range(0, len(action), 2):
-            op1, op2 = utils.actionToLayer(action[i:i + 2])
-            cloudRemainingFLOP -= sum(config.COMP_WORK_LOAD[op2 + 1:])
-            edgeRemainingFLOP[self.iotDevices[int(i / 2)].edgeIndex] -= sum(config.COMP_WORK_LOAD[op1 + 1:op2 + 1])
-            iotRemainingFLOP[int(i / 2)] -= sum(config.COMP_WORK_LOAD[0:op1 + 1])
+            for i in range(0, len(action), 2):
+                op1, op2 = utils.actionToLayer(action[i:i + 2])
+                cloudRemainingFLOP -= sum(config.COMP_WORK_LOAD[op2 + 1:])
+                edgeRemainingFLOP[self.iotDevices[int(i / 2)].edgeIndex] -= sum(config.COMP_WORK_LOAD[op1 + 1:op2 + 1])
+                iotRemainingFLOP[int(i / 2)] -= sum(config.COMP_WORK_LOAD[0:op1 + 1])
 
-            if sum(config.COMP_WORK_LOAD[op1 + 1:op2 + 1]):
-                self.edgeDevices[self.iotDevices[int(i / 2)].edgeIndex].connectedDevice += 1
-                edgesConnectedDeviceNum[self.iotDevices[int(i / 2)].edgeIndex] += 1
-            if sum(config.COMP_WORK_LOAD[op2 + 1:]) != 0:
-                self.cloud.connectedDevice += 1
+                if sum(config.COMP_WORK_LOAD[op1 + 1:op2 + 1]):
+                    self.edgeDevices[self.iotDevices[int(i / 2)].edgeIndex].connectedDevice += 1
+                    edgesConnectedDeviceNum[self.iotDevices[int(i / 2)].edgeIndex] += 1
+                if sum(config.COMP_WORK_LOAD[op2 + 1:]) != 0:
+                    self.cloud.connectedDevice += 1
 
-        for i in range(0, len(action), 2):
-            # Mapping float number to Offloading points
-            op1, op2 = utils.actionToLayer(action[i:i + 2])
-            offloadingPointsList.append(op1)
-            offloadingPointsList.append(op2)
+            for i in range(0, len(action), 2):
+                # Mapping float number to Offloading points
+                op1, op2 = utils.actionToLayer(action[i:i + 2])
+                offloadingPointsList.append(op1)
+                offloadingPointsList.append(op2)
 
-            # computing training time of this action
-            iot_comp_e, iot_comm_e, iot_comp_tt, iot_comm_tt = self.iotDevices[int(i / 2)].energy_tt(
-                splitPoints=[op1, op2],
-                remainingFlops=iotRemainingFLOP[int(i / 2)])
-            _, _, edge_comp_tt, edge_comm_tt = self.edgeDevices[self.iotDevices[int(i / 2)].edgeIndex] \
-                .energy_tt(splitPoints=[op1, op2],
-                           remainingFlops=edgeRemainingFLOP[self.iotDevices[int(i / 2)].edgeIndex])
-            _, _, cloud_comp_tt, cloud_comm_tt = self.cloud.energy_tt([op1, op2], remainingFlops=cloudRemainingFLOP)
+                # computing training time of this action
+                iot_comp_e, iot_comm_e, iot_comp_tt, iot_comm_tt = self.iotDevices[int(i / 2)].energy_tt(
+                    splitPoints=[op1, op2],
+                    remainingFlops=iotRemainingFLOP[int(i / 2)])
+                _, _, edge_comp_tt, edge_comm_tt = self.edgeDevices[self.iotDevices[int(i / 2)].edgeIndex] \
+                    .energy_tt(splitPoints=[op1, op2],
+                               remainingFlops=edgeRemainingFLOP[self.iotDevices[int(i / 2)].edgeIndex])
+                _, _, cloud_comp_tt, cloud_comm_tt = self.cloud.energy_tt([op1, op2], remainingFlops=cloudRemainingFLOP)
 
-            totalTrainingTime = (iot_comm_tt + iot_comp_tt) + (edge_comm_tt + edge_comp_tt) + (
-                    cloud_comm_tt + cloud_comp_tt)
-            allTrainingTimes.append(totalTrainingTime)
+                totalTrainingTime = (iot_comm_tt + iot_comp_tt) + (edge_comm_tt + edge_comp_tt) + (
+                        cloud_comm_tt + cloud_comp_tt)
+                allTrainingTimes.append(totalTrainingTime)
 
-            if totalTrainingTime > maxTrainingTime:
-                maxTrainingTime = totalTrainingTime
+                if totalTrainingTime > maxTrainingTime:
+                    maxTrainingTime = totalTrainingTime
 
-            # computing energy consumption of iot devices
-            total_comp_e += iot_comp_e
-            total_comm_e += iot_comm_e
+                # computing energy consumption of iot devices
+                total_comp_e += iot_comp_e
+                total_comm_e += iot_comm_e
 
         totalEnergyConsumption = (total_comm_e + total_comp_e)
         averageEnergyConsumption = totalEnergyConsumption / self.iotDeviceNum
@@ -248,6 +260,25 @@ class CustomEnv(gym.Env):
 
     def render(self):
         pass
+
+    # this function checks the action and if it's ok return new offloading point according to action.
+    def isActionValid(self, currentOffloadingPoint: list, currentAction: list) -> [bool, list]:
+        isValid = True
+        updatedOffloadingPoint = currentOffloadingPoint
+        # we must check the action has been taken for each device
+        for i in range(0, self.iotDeviceNum, 2):
+            if ((0 > currentOffloadingPoint[i] + currentAction[i] >= config.LAYER_NUM) or
+                    (0 > currentOffloadingPoint[i + 1] + currentAction[i + 1] >= config.LAYER_NUM) or
+                    (currentOffloadingPoint[i] + currentAction[i] > currentOffloadingPoint[i + 1] + currentAction[
+                        i + 1])):
+                isValid = False
+                break
+        # is action is ok we must create new offloading pointa
+        if isValid:
+            for i in range(0, self.iotDeviceNum, 2):
+                updatedOffloadingPoint[i] = currentOffloadingPoint[i] + currentAction[i]
+                updatedOffloadingPoint[i + 1] = currentOffloadingPoint[i + 1] + currentAction[i + 1]
+        return isValid, updatedOffloadingPoint
 
     def close(self):
         super().close()
