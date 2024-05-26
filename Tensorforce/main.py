@@ -1,6 +1,6 @@
 import sys
-
-sys.path.append("/home/alireza_soleymani/UniversityWorks/Thesis/FedSplitting-RL/")
+from config import ROOT_DIR
+sys.path.append(f"{ROOT_DIR}/FedSplitting-RL")
 import argparse
 from Tensorforce import runner
 

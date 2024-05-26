@@ -9,8 +9,8 @@ Tensorforce/test
 Tensorforce/agent
 Tensorforce/Logs
 Tensorforce/Graphs
-Tensorforce/tuner
+Tensorforce/tuner/
 SB3/Logs
 SB3/Graphs
 SB3/models
-SB3/ppo
+SB3/TensorboardLog
