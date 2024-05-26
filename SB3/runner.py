@@ -1,22 +1,18 @@
+from stable_baselines3 import PPO
+from SB3.environment.withBandwidth import CustomEnv
+from config import ROOT_DIR
+
 import sys
-import os
-from pathlib import Path
-
-ROOT_DIR = Path.cwd().parent
-sys.path.append(f"{ROOT_DIR}")
-
-from stable_baselines3 import A2C, PPO, SAC
 import utils
 
-from gymnasium.envs.registration import register
-from SB3.environment.withBandwidth import CustomEnv
+sys.path.append(f"{ROOT_DIR}")
 
 agent = 'PPO'
 fractions = 1.0
 total_time_step = 200000
 episode_len = 100
 
-logger = utils.createLog(fileName=f"SB3/Logs/SB3_{agent}_{fractions}")
+# logger = utils.createLog(fileName=f"SB3/Logs/SB3_{agent}_{fractions}")
 
 iotDevices = utils.createDeviceFromCSV(csvFilePath=f"{ROOT_DIR}/envs_stats/iotDevices.csv",
                                        deviceType='iotDevice')
@@ -34,8 +30,11 @@ env = CustomEnv(rewardTuningParams, iotDevices, edgeDevices, cloud, fraction=1.0
 # from stable_baselines3.common.env_checker import check_env
 #
 # print(check_env(env))
+model = PPO("MlpPolicy", env,
+            learning_rate=utils.linear_schedule(0.001), verbose=2, clip_range=0.5, gamma=0.1,
+            batch_size=1000, n_steps=1000, tensorboard_log=f'{ROOT_DIR}/SB3/TensorboardLog/ppo/1.0/',
+            device="auto")
 
-model = PPO("MlpPolicy", env, learning_rate=utils.linear_schedule(0.001), verbose=2, clip_range=0.5, gamma=0.1, batch_size=1000, n_steps=1000,tensorboard_log='/home/soleymani/FedSplitting-RL/SB3/ppo/1.0/' ,device="auto")
 model.learn(total_timesteps=total_time_step)
 model.save(f"{ROOT_DIR}/SB3/models/{agent}_{fractions}")
 
