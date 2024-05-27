@@ -65,74 +65,59 @@ class CustomEnv(gym.Env):
 
         self.fraction = fraction
 
-        # Each of the 4 devices has 7 possible actions (0-6)
-        action_spec = [2 * (config.LAYER_NUM - 1)] * self.iotDeviceNum * 2
+        # discrete action : 0% offload, 25% offload, 50% offload, 100% offload
+        # [6,6] , [0, 2] , [5, 6], [3, 4]
+        action_spec = [4] * self.iotDeviceNum
         print(f"action spec: {action_spec}")
         self.action_space = spaces.MultiDiscrete(action_spec)
 
-        self.observation_space = spaces.Box(low=0, high=100.0, shape=(
-            1 + 1 + self.iotDeviceNum + self.iotDeviceNum + self.edgeDeviceNum + (2 * self.iotDeviceNum),),
-                                            dtype=np.float32)
-        # self.observation_space = spaces.Dict({
-        #     'energy': spaces.Box(low=0.0, high=100.0, shape=(1,), dtype=np.float32),
-        #     'training_time': spaces.Box(low=0.0, high=100.0, shape=(1,), dtype=np.float32),
-        #     'transmitted_data': spaces.Box(low=0.0, high=100.0, shape=(self.iotDeviceNum,), dtype=np.float32),
-        #     'bandwidth': spaces.Box(low=0.0, high=100.0, shape=(self.iotDeviceNum + self.edgeDeviceNum,),
-        #                             dtype=np.float32),
-        #     'offloading_point': spaces.MultiDiscrete([config.LAYER_NUM - 1] * self.iotDeviceNum * 2)
-        # })
+        # bandwidths : 0% fluctuation, 10% fluctuation, 20% fluctuation,..., 90% fluctuation.
+        observation_spec = [10] * (self.iotDeviceNum + self.edgeDeviceNum)
+        self.observation_space = spaces.MultiDiscrete(observation_spec)
 
     def rewardFun(self, action):
-        print("-------------------------------")
-        print(f"Action: {action}")
-        print(f"curr action len: {len(self.currentAction)}")
-        for i in range(len(self.currentAction)):
-            self.currentAction[i] = action[i] - (config.LAYER_NUM - 1)
-        print(f"updated action: {self.currentAction}")
-        print(f"curr offloading points: {self.currentOffloadingPoint}")
+        offloadingPoint = self.actionToOffloadingPoint(action)
+        self.currentOffloadingPoint = offloadingPoint
+        # print("-------------------------------")
+        # print(f"Action: {action}")
+        # print(f"current action len: {len(self.currentAction)}")
+        # print(f"current offloading points: {self.currentOffloadingPoint}")
 
         allTrainingTimes = []
         total_comp_e = 0
         total_comm_e = 0
         edgesConnectedDeviceNum = [0] * self.edgeDeviceNum
 
-        isValid, updatedOffloadingPoint = self.isActionValid(self.currentOffloadingPoint, self.currentAction)
-        print(f"updated Offloading point: {updatedOffloadingPoint}")
+        isValid = self.isActionValid(self.currentAction)
+
         if not isValid:
             logger.info("-------------------------------------------")
             logger.info(f"Ops! INVALID ACTION")
             logger.info(f"Action: {action}")
-            logger.info(f"Offloading Point: {updatedOffloadingPoint}")
-
             return -1, self.currentState
         else:
             logger.info("-------------------------------------------")
-            logger.info(f"Current Offloading: {self.currentOffloadingPoint}")
-            logger.info(f"Current Action: {action}")
-            logger.info(f"Updated OffloadingPoint: {updatedOffloadingPoint}")
+            logger.info(f"Current Offloading: {self.currentOffloadingPoint}\n")
+            logger.info(f"Current Action: {action}\n")
 
-            transmittedData = [0] * self.iotDeviceNum
-            batchNum = 100
             for i in range(self.iotDeviceNum):
                 self.iotDevices[i].setEffectiveBW(self.effectiveBandwidth[i])
                 self.edgeDevices[self.iotDevices[i].edgeIndex].connectedDevice = 0
                 self.cloud.connectedDevice = 0
-                transmittedData[i] = batchNum * config.SIZE_OF_PARAM[updatedOffloadingPoint[i * 2]]
 
             for i in range(self.edgeDeviceNum):
                 self.edgeDevices[i].setEffectiveBW(self.effectiveBandwidth[i + self.iotDeviceNum])
 
             totalEnergyConsumption = 0
             maxTrainingTime = 0
-            offloadingPointsList = []
 
             iotRemainingFLOP = [iot.FLOPS for iot in self.iotDevices]
             edgeRemainingFLOP = [edge.FLOPS for edge in self.edgeDevices]
             cloudRemainingFLOP = self.cloud.FLOPS
 
-            for i in range(0, len(updatedOffloadingPoint), 2):
-                op1 = updatedOffloadingPoint[i]
-                op2 = updatedOffloadingPoint[i + 1]
+            for i in range(0, len(offloadingPoint), 2):
+                op1 = offloadingPoint[i]
+                op2 = offloadingPoint[i + 1]
                 cloudRemainingFLOP -= sum(config.COMP_WORK_LOAD[op2 + 1:])
                 edgeRemainingFLOP[self.iotDevices[int(i / 2)].edgeIndex] -= sum(config.COMP_WORK_LOAD[op1 + 1:op2 + 1])
                 iotRemainingFLOP[int(i / 2)] -= sum(config.COMP_WORK_LOAD[0:op1 + 1])
@@ -143,11 +128,9 @@ class CustomEnv(gym.Env):
                 if sum(config.COMP_WORK_LOAD[op2 + 1:]) != 0:
                     self.cloud.connectedDevice += 1
 
-            for i in range(0, len(action), 2):
-                # Mapping float number to Offloading points
-                op1, op2 = utils.actionToLayer(action[i:i + 2])
-                offloadingPointsList.append(op1)
-                offloadingPointsList.append(op2)
+            for i in range(0, len(offloadingPoint), 2):
+                op1 = offloadingPoint[i]
+                op2 = offloadingPoint[i + 1]
 
                 # computing training time of this action
                 iot_comp_e, iot_comm_e, iot_comp_tt, iot_comm_tt = self.iotDevices[int(i / 2)].energy_tt(
@@ -203,8 +186,8 @@ class CustomEnv(gym.Env):
             self.timestep_energy.append(averageEnergyConsumption)
             self.timestep_tt.append(maxTrainingTime)
             self.timestep_reward.append(reward)
-            logger.info(f"Current ClassicFL Energy: {self.currentClassicFLEnergy}")
-            logger.info(f"Current ClassicFL TrainingTime: {self.currentClassicFLTrainingTime}")
+            logger.info(f"Current ClassicFL Energy: {self.currentClassicFLEnergy}\n")
+            logger.info(f"Current ClassicFL TrainingTime: {self.currentClassicFLTrainingTime}\n")
             logger.info(f"Average Energy : {averageEnergyConsumption} \n")
             logger.info(f"Training Time : {maxTrainingTime} \n")
             logger.info(f"Bandwidth : {self.getBandwidth()} \n")
@@ -215,46 +198,20 @@ class CustomEnv(gym.Env):
             iotBandwidths = []
             edgeBandwidths = []
 
-            if self.getCurrentTimestep() < 50:
-                for iotDevice in self.iotDevices:
-                    iotBandwidths.append(iotDevice.bandwidth * 1.0)
+            for iotDevice in self.iotDevices:
+                randomBW = random.randint(1, 11)
+                iotBandwidths.append(iotDevice.bandwidth * randomBW * 0.1)
 
-                for edgeDevice in self.edgeDevices:
-                    edgeBandwidths.append(edgeDevice.bandwidth * 1.0)
-            elif 50 <= self.getCurrentTimestep() <= 100:
-                for iotDevice in self.iotDevices:
-                    iotBandwidths.append(iotDevice.bandwidth * 0.5)
-
-                for edgeDevice in self.edgeDevices:
-                    edgeBandwidths.append(edgeDevice.bandwidth * 0.5)
-            # elif 100 < self.getCurrentTimestep() < 150:
-            #     for iotDevice in self.iotDevices:
-            #         iotBandwidths.append(iotDevice.bandwidth * 3.0)
-            #
-            #     for edgeDevice in self.edgeDevices:
-            #         edgeBandwidths.append(edgeDevice.bandwidth * 3.0)
-            # else:
-            #     for iotDevice in self.iotDevices:
-            #         iotBandwidths.append(iotDevice.bandwidth * 4.0)
-            #
-            #     for edgeDevice in self.edgeDevices:
-            #         edgeBandwidths.append(edgeDevice.bandwidth * 4.0)
+            for edgeDevice in self.edgeDevices:
+                randomBW = random.randint(1, 11)
+                edgeBandwidths.append(edgeDevice.bandwidth * randomBW * 0.1)
 
             newBW = np.concatenate((iotBandwidths, edgeBandwidths), axis=0)
             self.setBandwidth(newBW)
 
-            # newState = dict(energy=normalizedAvgEnergy,
-            #                 training_time=normalizedTT,
-            #                 transmitted_data=transmittedData,
-            #                 bandwidth=self.getBandwidth(),
-            #                 offloading_point=offloadingPointsList)
-
-            newState = [normalizedAvgEnergy, normalizedTT]
-            newState = np.concatenate(
-                (newState, transmittedData, iotBandwidths, edgeBandwidths, updatedOffloadingPoint), axis=0)
-            self.currentState = newState
-            logger.info(f"New State: {newState}")
-            return reward, newState
+            self.currentState = self.getBandwidth()
+            logger.info(f"New State: {self.currentState}")
+            return reward, self.currentState
 
     def step(self, action):
         terminated = False
@@ -288,54 +245,35 @@ class CustomEnv(gym.Env):
         self.setCumulativeTT(0)
 
         iotBandwidths = []
-        for iotDevice in self.iotDevices:
-            iotBandwidths.append(np.random.uniform(low=iotDevice.bandwidth * 1.0, high=iotDevice.bandwidth))
-
         edgeBandwidths = []
+
+        for iotDevice in self.iotDevices:
+            randomBW = random.randint(1, 11)
+            iotBandwidths.append(iotDevice.bandwidth * randomBW * 0.1)
+
         for edgeDevice in self.edgeDevices:
-            edgeBandwidths.append(np.random.uniform(low=edgeDevice.bandwidth * 1.0, high=edgeDevice.bandwidth))
+            randomBW = random.randint(1, 11)
+            edgeBandwidths.append(edgeDevice.bandwidth * randomBW * 0.1)
 
         self.setBandwidth(bandwidth=np.concatenate((iotBandwidths, edgeBandwidths), axis=0))
         ClFLEnergy, ClFlTT = self.calculateClassicFLEnergyTT()
 
-        offloadingPointsList = [config.LAYER_NUM - 1] * self.iotDeviceNum * 2
-
-        transmittedData = [0] * self.iotDeviceNum
-        for i in range(self.iotDeviceNum):
-            transmittedData[i] = sum(config.SIZE_OF_PARAM)
-        # state = dict(energy=ClFLEnergy,
-        #              training_time=ClFlTT,
-        #              bandwidth=self.getBandwidth(),
-        #              transmitted_data=transmittedData,
-        #              offloading_point=offloadingPointsList)
-
-        newState = [1, 1]
-        newState = np.concatenate((newState, transmittedData, iotBandwidths, edgeBandwidths, offloadingPointsList),
-                                  axis=0)
-        self.currentState = newState
-        return newState, {}
+        self.currentState = self.getBandwidth()
+        return self.currentState, {}
 
     def render(self):
         pass
 
-    # this function checks the action and if it's ok return new offloading point according to action.
-    def isActionValid(self, currentOffloadingPoint: list, currentAction: list) -> [bool, list]:
+    # this function checks the action, it's ok or not.
+    def isActionValid(self, currentAction: list) -> [bool]:
         isValid = True
-        updatedOffloadingPoint = currentOffloadingPoint
-        # we must check the action has been taken for each device
-        for i in range(0, self.iotDeviceNum):
-            if ((0 > currentOffloadingPoint[i] + currentAction[i] >= config.LAYER_NUM) or
-                    (0 > currentOffloadingPoint[i + 1] + currentAction[i + 1] >= config.LAYER_NUM) or
-                    (currentOffloadingPoint[i] + currentAction[i] > currentOffloadingPoint[i + 1] + currentAction[
-                        i + 1])):
-                isValid = False
-                break
-        # is action is ok we must create new offloading pointa
-        if isValid:
-            for i in range(0, self.iotDeviceNum, 2):
-                updatedOffloadingPoint[i] = currentOffloadingPoint[i] + currentAction[i]
-                updatedOffloadingPoint[i + 1] = currentOffloadingPoint[i + 1] + currentAction[i + 1]
-        return isValid, updatedOffloadingPoint
+        allowed_digits = {'0', '1', '2', '3'}
+
+        for digit in str(currentAction[0]):
+            if digit not in allowed_digits:
+                return False
+
+        return True
 
     def calculateClassicFLEnergyTT(self):
         allTrainingTimes = []
@@ -398,10 +336,27 @@ class CustomEnv(gym.Env):
         averageEnergyConsumption = totalEnergyConsumption / self.iotDeviceNum
         return averageEnergyConsumption, maxTrainingTime
 
+    def actionToOffloadingPoint(self, action):
+        offloadingPoint = []
+        for i in range(self.iotDeviceNum):
+            if action[i] == 0:
+                offloadingPoint.append(6)
+                offloadingPoint.append(6)
+            elif action[i] == 1:
+                offloadingPoint.append(5)
+                offloadingPoint.append(6)
+            elif action[i] == 2:
+                offloadingPoint.append(3)
+                offloadingPoint.append(4)
+            elif action[i] == 3:
+                offloadingPoint.append(0)
+                offloadingPoint.append(2)
+        return offloadingPoint
+
     def close(self):
         super().close()
 
-    def setBandwidth(self, bandwidth: list):
+    def setBandwidth(self, bandwidth):
         self.effectiveBandwidth = bandwidth
 
     def getBandwidth(self):

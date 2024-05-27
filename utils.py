@@ -10,10 +10,7 @@ import plotly.graph_objects as go
 import config
 from entities.Device_bandwidthState import Device as Device
 from typing import Callable
-
-
 # from entities.Device import Device
-
 
 def createDeviceFromCSV(csvFilePath: str, deviceType: str = 'cloud') -> list:
     devices = list()
@@ -105,7 +102,7 @@ def actionToLayer(splitDecision: list) -> tuple:
 
         totalWorkLoad = sum(workLoad)
         model_flops_list = np.array(model_state_flops)
-        model_flops_list = ((model_flops_list / totalWorkLoad)*2)-1
+        model_flops_list = ((model_flops_list / totalWorkLoad) * 2) - 1
 
         idx = np.where(np.abs(model_flops_list - splitDecision[0]) == np.abs(model_flops_list - splitDecision[0]).min())
         op1 = int(idx[0][-1])
@@ -389,6 +386,7 @@ def linear_schedule(initial_value: float) -> Callable[[float], float]:
         return progress_remaining * initial_value
 
     return func
+
 
 def preTrainEnv(iotDevices: list, edgeDevices: list, cloud: Device, action) -> tuple:
     edgesConnectedDeviceNum = [0] * len(edgeDevices)
