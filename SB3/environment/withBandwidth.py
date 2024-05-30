@@ -15,7 +15,7 @@ logger = logging.getLogger()
 class CustomEnv(gym.Env):
     """Custom Environment that follows gym interface."""
 
-    def __init__(self, rewardTuningParams, iotDevices: list, edgeDevices: list, cloud: Device,
+    def __init__(self, iotDevices: list, edgeDevices: list, cloud: Device,
                  fraction=0.8, ep_length: int = 100):
         super().__init__()
 
@@ -26,8 +26,6 @@ class CustomEnv(gym.Env):
         self.edgeDevices: list = edgeDevices
         self.cloud: Device = cloud
 
-        self.ClassicFLEnergy = rewardTuningParams[0]
-        self.ClassicFLTrainingTime = rewardTuningParams[1]
         self.currentClassicFLEnergy = 0
         self.currentClassicFLTrainingTime = 0
 
@@ -65,153 +63,136 @@ class CustomEnv(gym.Env):
 
         self.fraction = fraction
 
-        # discrete action : 0% offload, 25% offload, 50% offload, 100% offload
-        # [6,6] , [0, 2] , [5, 6], [3, 4]
-        action_spec = [4] * self.iotDeviceNum
-        print(f"action spec: {action_spec}")
-        self.action_space = spaces.MultiDiscrete(action_spec)
+        self.action_space = spaces.Box(low=0.0, high=1.0, shape=(2 * self.iotDeviceNum,), dtype=np.float32, seed=1)
 
         # bandwidths : 0% fluctuation, 10% fluctuation, 20% fluctuation,..., 90% fluctuation.
         observation_spec = [10] * (self.iotDeviceNum + self.edgeDeviceNum)
-        self.observation_space = spaces.MultiDiscrete(observation_spec)
+        self.observation_space = spaces.Box(low=0.0, high=20.0, shape=(self.iotDeviceNum + self.edgeDeviceNum,),
+                                            dtype=np.float32, seed=1)
 
     def rewardFun(self, action):
-        offloadingPoint = self.actionToOffloadingPoint(action)
-        self.currentOffloadingPoint = offloadingPoint
-        # print("-------------------------------")
-        # print(f"Action: {action}")
-        # print(f"current action len: {len(self.currentAction)}")
-        # print(f"current offloading points: {self.currentOffloadingPoint}")
-
         allTrainingTimes = []
         total_comp_e = 0
         total_comm_e = 0
         edgesConnectedDeviceNum = [0] * self.edgeDeviceNum
+        offloadingPoints = []
 
-        isValid = self.isActionValid(self.currentAction)
+        logger.info("-------------------------------------------")
+        logger.info(f"Current Action: {action}\n")
 
-        if not isValid:
-            logger.info("-------------------------------------------")
-            logger.info(f"Ops! INVALID ACTION")
-            logger.info(f"Action: {action}")
-            return -1, self.currentState
+        for i in range(self.iotDeviceNum):
+            self.iotDevices[i].setEffectiveBW(self.effectiveBandwidth[i])
+            self.edgeDevices[self.iotDevices[i].edgeIndex].connectedDevice = 0
+            self.cloud.connectedDevice = 0
+
+        for i in range(self.edgeDeviceNum):
+            self.edgeDevices[i].setEffectiveBW(self.effectiveBandwidth[i + self.iotDeviceNum])
+
+        totalEnergyConsumption = 0
+        maxTrainingTime = 0
+
+        iotRemainingFLOP = [iot.FLOPS for iot in self.iotDevices]
+        edgeRemainingFLOP = [edge.FLOPS for edge in self.edgeDevices]
+        cloudRemainingFLOP = self.cloud.FLOPS
+
+        for i in range(0, len(action), 2):
+            op1, op2 = utils.actionToLayer(action[i:i + 2])
+            offloadingPoints.append(op1)
+            offloadingPoints.append(op2)
+
+            cloudRemainingFLOP -= sum(config.COMP_WORK_LOAD[op2 + 1:])
+            edgeRemainingFLOP[self.iotDevices[int(i / 2)].edgeIndex] -= sum(config.COMP_WORK_LOAD[op1 + 1:op2 + 1])
+            iotRemainingFLOP[int(i / 2)] -= sum(config.COMP_WORK_LOAD[0:op1 + 1])
+
+            if sum(config.COMP_WORK_LOAD[op1 + 1:op2 + 1]):
+                self.edgeDevices[self.iotDevices[int(i / 2)].edgeIndex].connectedDevice += 1
+                edgesConnectedDeviceNum[self.iotDevices[int(i / 2)].edgeIndex] += 1
+            if sum(config.COMP_WORK_LOAD[op2 + 1:]) != 0:
+                self.cloud.connectedDevice += 1
+        self.currentOffloadingPoint = offloadingPoints
+        logger.info(f"Current Offloading: {self.currentOffloadingPoint}\n")
+
+        for i in range(0, len(offloadingPoints), 2):
+            op1 = offloadingPoints[i]
+            op2 = offloadingPoints[i + 1]
+
+            # computing training time of this action
+            iot_comp_e, iot_comm_e, iot_comp_tt, iot_comm_tt = self.iotDevices[int(i / 2)].energy_tt(
+                splitPoints=[op1, op2],
+                remainingFlops=iotRemainingFLOP[int(i / 2)])
+            _, _, edge_comp_tt, edge_comm_tt = self.edgeDevices[self.iotDevices[int(i / 2)].edgeIndex] \
+                .energy_tt(splitPoints=[op1, op2],
+                           remainingFlops=edgeRemainingFLOP[self.iotDevices[int(i / 2)].edgeIndex])
+            _, _, cloud_comp_tt, cloud_comm_tt = self.cloud.energy_tt([op1, op2], remainingFlops=cloudRemainingFLOP)
+
+            totalTrainingTime = (iot_comm_tt + iot_comp_tt) + (edge_comm_tt + edge_comp_tt) + (
+                    cloud_comm_tt + cloud_comp_tt)
+            allTrainingTimes.append(totalTrainingTime)
+
+            if totalTrainingTime > maxTrainingTime:
+                maxTrainingTime = totalTrainingTime
+
+            # computing energy consumption of iot devices
+            total_comp_e += iot_comp_e
+            total_comm_e += iot_comm_e
+
+        totalEnergyConsumption = (total_comm_e + total_comp_e)
+        averageEnergyConsumption = totalEnergyConsumption / self.iotDeviceNum
+
+        self.currentClassicFLEnergy, self.currentClassicFLTrainingTime = self.calculateClassicFLEnergyTT()
+        rewardOfTrainingTime = maxTrainingTime
+        rewardOfTrainingTime -= self.currentClassicFLTrainingTime
+        rewardOfTrainingTime /= 1200
+        rewardOfTrainingTime *= -1
+
+        rewardOfTrainingTime = min(max(rewardOfTrainingTime, -1), 1)
+
+        rewardOfEnergy = averageEnergyConsumption
+        rewardOfEnergy -= self.currentClassicFLEnergy
+        rewardOfEnergy /= 10
+        rewardOfEnergy *= -1
+
+        rewardOfEnergy = min(max(rewardOfEnergy, -1), 1)
+
+        self.avgEnergy = averageEnergyConsumption
+        self.tt = maxTrainingTime
+        self.rewardOfEnergy = (self.fraction * rewardOfEnergy)
+        self.rewardOfTrainingTime = (1 - self.fraction) * rewardOfTrainingTime
+
+        if self.fraction <= 1:
+            reward = (self.fraction * rewardOfEnergy) + ((1 - self.fraction) * rewardOfTrainingTime)
         else:
-            logger.info("-------------------------------------------")
-            logger.info(f"Current Offloading: {self.currentOffloadingPoint}\n")
-            logger.info(f"Current Action: {action}\n")
+            raise Exception("Fraction must be less than 1")
 
-            for i in range(self.iotDeviceNum):
-                self.iotDevices[i].setEffectiveBW(self.effectiveBandwidth[i])
-                self.edgeDevices[self.iotDevices[i].edgeIndex].connectedDevice = 0
-                self.cloud.connectedDevice = 0
+        self.timestep_energy.append(averageEnergyConsumption)
+        self.timestep_tt.append(maxTrainingTime)
+        self.timestep_reward.append(reward)
+        logger.info(f"Current ClassicFL Energy: {self.currentClassicFLEnergy}\n")
+        logger.info(f"Current ClassicFL TrainingTime: {self.currentClassicFLTrainingTime}\n")
+        logger.info(f"Average Energy : {averageEnergyConsumption} \n")
+        logger.info(f"Training Time : {maxTrainingTime} \n")
+        logger.info(f"Bandwidth : {self.getBandwidth()} \n")
+        logger.info(f"Reward of this action : {reward} \n")
+        logger.info(f"Reward of energy : {self.rewardOfEnergy} \n")
+        logger.info(f"Reward of training time : {self.rewardOfTrainingTime} \n")
 
-            for i in range(self.edgeDeviceNum):
-                self.edgeDevices[i].setEffectiveBW(self.effectiveBandwidth[i + self.iotDeviceNum])
+        iotBandwidths = []
+        edgeBandwidths = []
 
-            totalEnergyConsumption = 0
-            maxTrainingTime = 0
+        for iotDevice in self.iotDevices:
+            randomBW = random.randint(1, 11)
+            iotBandwidths.append(iotDevice.bandwidth * randomBW * 0.1)
 
-            iotRemainingFLOP = [iot.FLOPS for iot in self.iotDevices]
-            edgeRemainingFLOP = [edge.FLOPS for edge in self.edgeDevices]
-            cloudRemainingFLOP = self.cloud.FLOPS
+        for edgeDevice in self.edgeDevices:
+            randomBW = random.randint(1, 11)
+            edgeBandwidths.append(edgeDevice.bandwidth * randomBW * 0.1)
 
-            for i in range(0, len(offloadingPoint), 2):
-                op1 = offloadingPoint[i]
-                op2 = offloadingPoint[i + 1]
-                cloudRemainingFLOP -= sum(config.COMP_WORK_LOAD[op2 + 1:])
-                edgeRemainingFLOP[self.iotDevices[int(i / 2)].edgeIndex] -= sum(config.COMP_WORK_LOAD[op1 + 1:op2 + 1])
-                iotRemainingFLOP[int(i / 2)] -= sum(config.COMP_WORK_LOAD[0:op1 + 1])
+        newBW = np.concatenate((iotBandwidths, edgeBandwidths), axis=0)
+        self.setBandwidth(newBW)
 
-                if sum(config.COMP_WORK_LOAD[op1 + 1:op2 + 1]):
-                    self.edgeDevices[self.iotDevices[int(i / 2)].edgeIndex].connectedDevice += 1
-                    edgesConnectedDeviceNum[self.iotDevices[int(i / 2)].edgeIndex] += 1
-                if sum(config.COMP_WORK_LOAD[op2 + 1:]) != 0:
-                    self.cloud.connectedDevice += 1
-
-            for i in range(0, len(offloadingPoint), 2):
-                op1 = offloadingPoint[i]
-                op2 = offloadingPoint[i + 1]
-
-                # computing training time of this action
-                iot_comp_e, iot_comm_e, iot_comp_tt, iot_comm_tt = self.iotDevices[int(i / 2)].energy_tt(
-                    splitPoints=[op1, op2],
-                    remainingFlops=iotRemainingFLOP[int(i / 2)])
-                _, _, edge_comp_tt, edge_comm_tt = self.edgeDevices[self.iotDevices[int(i / 2)].edgeIndex] \
-                    .energy_tt(splitPoints=[op1, op2],
-                               remainingFlops=edgeRemainingFLOP[self.iotDevices[int(i / 2)].edgeIndex])
-                _, _, cloud_comp_tt, cloud_comm_tt = self.cloud.energy_tt([op1, op2], remainingFlops=cloudRemainingFLOP)
-
-                totalTrainingTime = (iot_comm_tt + iot_comp_tt) + (edge_comm_tt + edge_comp_tt) + (
-                        cloud_comm_tt + cloud_comp_tt)
-                allTrainingTimes.append(totalTrainingTime)
-
-                if totalTrainingTime > maxTrainingTime:
-                    maxTrainingTime = totalTrainingTime
-
-                # computing energy consumption of iot devices
-                total_comp_e += iot_comp_e
-                total_comm_e += iot_comm_e
-
-            totalEnergyConsumption = (total_comm_e + total_comp_e)
-            averageEnergyConsumption = totalEnergyConsumption / self.iotDeviceNum
-
-            normalizedAvgEnergy = averageEnergyConsumption / self.ClassicFLEnergy
-            normalizedTT = maxTrainingTime / self.ClassicFLTrainingTime
-
-            self.currentClassicFLEnergy, self.currentClassicFLTrainingTime = self.calculateClassicFLEnergyTT()
-            rewardOfTrainingTime = maxTrainingTime
-            rewardOfTrainingTime -= self.currentClassicFLTrainingTime
-            rewardOfTrainingTime /= 1200
-            rewardOfTrainingTime *= -1
-
-            rewardOfTrainingTime = min(max(rewardOfTrainingTime, -1), 1)
-
-            rewardOfEnergy = averageEnergyConsumption
-            rewardOfEnergy -= self.currentClassicFLEnergy
-            rewardOfEnergy /= 10
-            rewardOfEnergy *= -1
-
-            rewardOfEnergy = min(max(rewardOfEnergy, -1), 1)
-
-            self.avgEnergy = averageEnergyConsumption
-            self.tt = maxTrainingTime
-            self.rewardOfEnergy = (self.fraction * rewardOfEnergy)
-            self.rewardOfTrainingTime = (1 - self.fraction) * rewardOfTrainingTime
-
-            if self.fraction <= 1:
-                reward = (self.fraction * rewardOfEnergy) + ((1 - self.fraction) * rewardOfTrainingTime)
-            else:
-                raise Exception("Fraction must be less than 1")
-
-            self.timestep_energy.append(averageEnergyConsumption)
-            self.timestep_tt.append(maxTrainingTime)
-            self.timestep_reward.append(reward)
-            logger.info(f"Current ClassicFL Energy: {self.currentClassicFLEnergy}\n")
-            logger.info(f"Current ClassicFL TrainingTime: {self.currentClassicFLTrainingTime}\n")
-            logger.info(f"Average Energy : {averageEnergyConsumption} \n")
-            logger.info(f"Training Time : {maxTrainingTime} \n")
-            logger.info(f"Bandwidth : {self.getBandwidth()} \n")
-            logger.info(f"Reward of this action : {reward} \n")
-            logger.info(f"Reward of energy : {self.rewardOfEnergy} \n")
-            logger.info(f"Reward of training time : {self.rewardOfTrainingTime} \n")
-
-            iotBandwidths = []
-            edgeBandwidths = []
-
-            for iotDevice in self.iotDevices:
-                randomBW = random.randint(1, 11)
-                iotBandwidths.append(iotDevice.bandwidth * randomBW * 0.1)
-
-            for edgeDevice in self.edgeDevices:
-                randomBW = random.randint(1, 11)
-                edgeBandwidths.append(edgeDevice.bandwidth * randomBW * 0.1)
-
-            newBW = np.concatenate((iotBandwidths, edgeBandwidths), axis=0)
-            self.setBandwidth(newBW)
-
-            self.currentState = self.getBandwidth()
-            logger.info(f"New State: {self.currentState}")
-            return reward, self.currentState
+        self.currentState = self.getBandwidth()
+        logger.info(f"New State: {self.currentState}")
+        return reward, self.currentState
 
     def step(self, action):
         terminated = False
@@ -256,24 +237,12 @@ class CustomEnv(gym.Env):
             edgeBandwidths.append(edgeDevice.bandwidth * randomBW * 0.1)
 
         self.setBandwidth(bandwidth=np.concatenate((iotBandwidths, edgeBandwidths), axis=0))
-        ClFLEnergy, ClFlTT = self.calculateClassicFLEnergyTT()
 
         self.currentState = self.getBandwidth()
         return self.currentState, {}
 
     def render(self):
         pass
-
-    # this function checks the action, it's ok or not.
-    def isActionValid(self, currentAction: list) -> [bool]:
-        isValid = True
-        allowed_digits = {'0', '1', '2', '3'}
-
-        for digit in str(currentAction[0]):
-            if digit not in allowed_digits:
-                return False
-
-        return True
 
     def calculateClassicFLEnergyTT(self):
         allTrainingTimes = []
@@ -335,23 +304,6 @@ class CustomEnv(gym.Env):
         totalEnergyConsumption = (total_comm_e + total_comp_e)
         averageEnergyConsumption = totalEnergyConsumption / self.iotDeviceNum
         return averageEnergyConsumption, maxTrainingTime
-
-    def actionToOffloadingPoint(self, action):
-        offloadingPoint = []
-        for i in range(self.iotDeviceNum):
-            if action[i] == 0:
-                offloadingPoint.append(6)
-                offloadingPoint.append(6)
-            elif action[i] == 1:
-                offloadingPoint.append(5)
-                offloadingPoint.append(6)
-            elif action[i] == 2:
-                offloadingPoint.append(3)
-                offloadingPoint.append(4)
-            elif action[i] == 3:
-                offloadingPoint.append(0)
-                offloadingPoint.append(2)
-        return offloadingPoint
 
     def close(self):
         super().close()

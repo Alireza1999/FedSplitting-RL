@@ -10,6 +10,8 @@ import plotly.graph_objects as go
 import config
 from entities.Device_bandwidthState import Device as Device
 from typing import Callable
+
+
 # from entities.Device import Device
 
 def createDeviceFromCSV(csvFilePath: str, deviceType: str = 'cloud') -> list:
@@ -102,7 +104,7 @@ def actionToLayer(splitDecision: list) -> tuple:
 
         totalWorkLoad = sum(workLoad)
         model_flops_list = np.array(model_state_flops)
-        model_flops_list = ((model_flops_list / totalWorkLoad) * 2) - 1
+        model_flops_list = (model_flops_list / totalWorkLoad)
 
         idx = np.where(np.abs(model_flops_list - splitDecision[0]) == np.abs(model_flops_list - splitDecision[0]).min())
         op1 = int(idx[0][-1])
@@ -119,7 +121,7 @@ def actionToLayer(splitDecision: list) -> tuple:
 
         return op1, op2
 
-
+print(actionToLayer([0.0, 0.0]))
 # def actionToLayer(splitDecision: list[float]) -> tuple[int, int]:
 #     """ It returns the offloading points for the given action ( op1 , op2 )"""
 #

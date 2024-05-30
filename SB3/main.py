@@ -1,13 +1,14 @@
 import sys
+from pathlib import Path
+ROOT_DIR = Path.cwd().parent
+sys.path.append(f"{ROOT_DIR}")
 
-sys.path.append("/home/alireza_soleymani/UniversityWorks/Thesis/FedSplitting-RL/")
 import argparse
-from Tensorforce import runner
+from SB3.runner import Runner
 
 arguments = {
     '-a': ['--agent', 'tensorforce',
-           '[String] name of the RL agent[ppo, firstFit, ac, trpo, tensorforce, random, noSplitting]'],
-    '-env': ['--env', 'default', '[String] name of the environment [fedAdapt, default, defaultNoEdge, bandwidthInState]'],
+           '[String] name of the RL agent[ppo, firstFit, ac, trpo]'],
     '-f': ['--fraction', 0.8, '[float] The fraction of energy and training time that is used for training RL'],
     '-e': ['--episode', 501, '[int] Number of episodes'],
     '-t': ['--timestep', 200, '[int] Number of timestep of each episode'],
@@ -25,10 +26,16 @@ def parse_argument(parser: argparse.ArgumentParser(), arg: dict):
     return option
 
 
-parser = argparse.ArgumentParser()
-options = parse_argument(parser=parser, arg=arguments)
+def mainRunner():
+    parser = argparse.ArgumentParser()
+    options = parse_argument(parser=parser, arg=arguments)
 
-runner = runner.Runner(agentType=options['agent'], envType=options["env"], episodeNum=int(options['episode']),
-                       timestepNum=int(options['timestep']), fraction=float(options['fraction']),
-                       summaries=options['summaries'], log=options['log'])
-runner.run()
+    runner = Runner(agentType=options['agent'], episodeNum=int(options['episode']),
+                    timestepNum=int(options['timestep']), fraction=float(options['fraction']),
+                    summaries=options['summaries'], log=options['log'])
+    runner.run()
+    runner.evaluation()
+
+
+if __name__ == '__main__':
+    mainRunner()
