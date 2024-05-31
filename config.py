@@ -8,4 +8,6 @@ COMP_TIME_OF_LAYERS_clients = [4.5, 2.5, 6.15, 2.0, 3.7, 1.8, 1.35]
 COMP_TIME_OF_LAYERS_edges = [2.25, 1.25, 3.07, 1.0, 1.8, 0.9, 0.65]
 COMP_TIME_OF_LAYERS_cloud = [1.125, 0.65, 1.53, 0.5, 0.9, 0.45, 0.325]
 
+BOT_TOKEN = '7324689712:AAHMcJX1Yk8_GK0blQZxPQZVLAwWZKHwdu0'
+
 ROOT_DIR = Path.cwd().parent

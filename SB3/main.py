@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+
 ROOT_DIR = Path.cwd().parent
 sys.path.append(f"{ROOT_DIR}")
 
@@ -7,11 +8,15 @@ import argparse
 from SB3.runner import Runner
 
 arguments = {
-    '-a': ['--agent', 'tensorforce',
+    '-a': ['--agent', 'ppo',
            '[String] name of the RL agent[ppo, firstFit, ac, trpo]'],
     '-f': ['--fraction', 0.8, '[float] The fraction of energy and training time that is used for training RL'],
-    '-e': ['--episode', 501, '[int] Number of episodes'],
-    '-t': ['--timestep', 200, '[int] Number of timestep of each episode'],
+    '-lr': ['--learningRate', 0.003, '[float] The learning rate for RL'],
+    '-b': ['--batchSize', 1000, '[int] The batch size for RL'],
+    '-ns': ['--numSteps', 1000, '[int] The number of training steps for RL'],
+    '-c': ['--clip', 0.3, '[float] The clipping value for RL'],
+    '-e': ['--episode', 5000, '[int] Number of episodes'],
+    '-t': ['--timestep', 1, '[int] Number of timestep of each episode'],
     '-s': ['--summaries', True, '[boolean] Save the summaries or not'],
     '-l': ['--log', True, '[boolean] save log or not']
 }
@@ -32,7 +37,8 @@ def mainRunner():
 
     runner = Runner(agentType=options['agent'], episodeNum=int(options['episode']),
                     timestepNum=int(options['timestep']), fraction=float(options['fraction']),
-                    summaries=options['summaries'], log=options['log'])
+                    summaries=options['summaries'], log=options['log'], batch_size=int(options['batchSize']),
+                    lr=float(options['learningRate']), n_step=int(options['numSteps']), clip=float(options['clip']))
     runner.run()
     runner.evaluation()
 
