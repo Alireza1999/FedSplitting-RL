@@ -1,18 +1,167 @@
 import csv
+import json
 import logging
 import os
 import random
+from typing import Callable
 
 import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
+from stable_baselines3 import PPO, A2C
 
 import config
 from entities.Device_bandwidthState import Device as Device
-from typing import Callable
 
 
 # from entities.Device import Device
+
+def saveGraphs(savePath, energy, trainingTime, reward, rewardOfEnergy, rewardOfTrainingTime, x, allEnergy,
+               allTrainingTime):
+    draw_graph(title="Reward vs Episode",
+               xlabel="Episode",
+               ylabel="Reward",
+               figSizeX=10,
+               figSizeY=5,
+               x=x,
+               y=reward,
+               savePath=savePath,
+               pictureName=f"reward_episode")
+
+    draw_graph(title="Avg Energy vs Episode",
+               xlabel="Episode",
+               ylabel="Average Energy",
+               figSizeX=10,
+               figSizeY=5,
+               x=x,
+               y=energy,
+               savePath=savePath,
+               pictureName=f"energy_episode")
+
+    draw_graph(title="Avg TrainingTime vs Episode",
+               xlabel="Episode",
+               ylabel="TrainingTime",
+               figSizeX=10,
+               figSizeY=5,
+               x=x,
+               y=trainingTime,
+               savePath=savePath,
+               pictureName=f"training_time_episode")
+
+    draw_scatter(title="Energy vs TrainingTime",
+                 xlabel="Energy",
+                 ylabel="TrainingTime",
+                 x=allEnergy,
+                 y=allTrainingTime,
+                 savePath=savePath,
+                 pictureName=f"energy_training_time_Scatter")
+
+    plt.figure(figsize=(int(10), int(5)))
+    plt.plot(x, rewardOfEnergy, color='red', label='Energy reward')
+    plt.plot(x, rewardOfTrainingTime, color='green', label='TrainingTime reward')
+    plt.plot(x, reward, color='blue', label='Total Reward')
+    plt.legend()
+    plt.title("All Reward Graphs")
+    plt.xlabel("episode")
+    plt.ylabel("reward")
+    plt.savefig(os.path.join(savePath, f"rewards_fraction"))
+    plt.close()
+
+
+def createSummaryFromModel(model, lr, fraction, agentType, clip, episodeNum, timestep, batchSize) -> dict:
+    model_dict = model.__dict__
+    summary = dict()
+    print(model_dict)
+    summary["learning_rate"] = lr
+    summary["fraction"] = fraction
+    summary["agentType"] = agentType
+    summary["episode_num"] = episodeNum
+    summary["num_timesteps"] = timestep
+    summary["total_timesteps"] = timestep * episodeNum
+    summary["clip_range"] = clip
+    summary["batch_size"] = batchSize
+
+    summary["policy_kwargs"] = model_dict["policy_kwargs"]
+    summary["seed"] = model_dict["seed"]
+    summary["tensorboard_log"] = model_dict["tensorboard_log"]
+    summary["use_sde"] = model_dict["use_sde"]
+    summary["sde_sample_freq"] = model_dict["sde_sample_freq"]
+    summary["_stats_window_size"] = model_dict["_stats_window_size"]
+    summary["_n_updates"] = model_dict["_n_updates"]
+    summary["n_steps"] = model_dict["n_steps"]
+    summary["gamma"] = model_dict["gamma"]
+    summary["gae_lambda"] = model_dict["gae_lambda"]
+    summary["ent_coef"] = model_dict["ent_coef"]
+    summary["vf_coef"] = model_dict["vf_coef"]
+    summary["max_grad_norm"] = model_dict["max_grad_norm"]
+    summary["n_epochs"] = model_dict["n_epochs"]
+    summary["normalize_advantage"] = model_dict["normalize_advantage"]
+    summary["target_kl"] = model_dict["target_kl"]
+    return summary
+
+
+def checkSummaryAndSaveConfig(configPath: str, summary: dict):
+    """ First, this function check that new summary has been saved before or not
+    If we ran model with this config before, so it does not save new config
+    but if it was new config we'll create new config record and we wll save picture """
+
+    isDuplicate = False
+    duplicateIndex = 0
+    lastIndex = 0
+    f = open(f"{configPath}.json")
+
+    # returns JSON object as
+    # a dictionary
+    configList = json.load(f)
+
+    # Iterate through each dictionary in the list
+    for item in configList:
+        isDuplicate = False
+        # Iterate through each key in the dictionary
+        for key in item:
+            lastIndex += 1
+            if summary == item[key]:
+                isDuplicate = True
+                duplicateIndex = lastIndex
+
+    temp = dict()
+    lastIndex += 1
+    temp[f"{lastIndex}"] = summary
+
+    if not isDuplicate:
+        configList.append(temp)
+        folderName = lastIndex
+    else:
+        folderName = duplicateIndex
+
+    with open(f"{configPath}.json", 'w', encoding='utf-8') as f:
+        json.dump(configList, f, ensure_ascii=False, indent=4)
+
+    # Closing file
+    f.close()
+    return isDuplicate, folderName
+
+
+def createAgent(env, lr, clip, batch_size, n_step, agentType='ppo'):
+    if agentType == 'ppo':
+        return PPO("MlpPolicy", env, learning_rate=linear_schedule(lr), verbose=2, clip_range=clip,
+                   gamma=1.0, batch_size=batch_size, n_steps=n_step, device="cpu")
+    elif agentType == 'ac':
+        return A2C("MlpPolicy", env, learning_rate=linear_schedule(lr), verbose=2, gamma=1.0,
+                   n_steps=n_step, device="auto")
+    else:
+        raise Exception('Invalid config select from [ppo, ac, tensorforce, random]')
+
+
+def loadAgent(env, agentType, agent_index):
+    loadPath = f"{config.ROOT_DIR}/SB3/models/{agent_index}"
+    if agentType == 'ppo':
+        return PPO.load(loadPath, env=env)
+    elif agentType == 'ac':
+        return A2C.load(loadPath, env=env)
+    else:
+        raise Exception('Invalid config select from [ppo, ac]')
+
 
 def createDeviceFromCSV(csvFilePath: str, deviceType: str = 'cloud') -> list:
     devices = list()
@@ -121,7 +270,10 @@ def actionToLayer(splitDecision: list) -> tuple:
 
         return op1, op2
 
+
 print(actionToLayer([0.0, 0.0]))
+
+
 # def actionToLayer(splitDecision: list[float]) -> tuple[int, int]:
 #     """ It returns the offloading points for the given action ( op1 , op2 )"""
 #

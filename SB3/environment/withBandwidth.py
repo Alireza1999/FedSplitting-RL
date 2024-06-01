@@ -40,8 +40,10 @@ class CustomEnv(gym.Env):
 
         self.avgEnergy = 0
         self.tt = 0
+
         self.rewardOfEnergy = 0
         self.rewardOfTrainingTime = 0
+
         self.energyOfComputation = 0
         self.energyOfCommunication = 0
         self.trainingTimeOfComputation = 0
@@ -50,10 +52,14 @@ class CustomEnv(gym.Env):
         self.timestep_energy = []
         self.timestep_tt = []
         self.timestep_reward = []
+        self.timestep_energy_reward = []
+        self.timestep_tt_reward = []
 
         self.episode_energy = []
         self.episode_tt = []
         self.episode_reward = []
+        self.episode_energy_reward = []
+        self.episode_tt_reward = []
 
         self.effectiveBandwidth = []
 
@@ -63,12 +69,11 @@ class CustomEnv(gym.Env):
 
         self.fraction = fraction
 
-        self.action_space = spaces.Box(low=0.0, high=1.0, shape=(2 * self.iotDeviceNum,), dtype=np.float32, seed=1)
+        self.action_space = spaces.Box(low=0.0, high=1.0, shape=(2 * self.iotDeviceNum,), dtype=np.float32, seed=None)
 
         # bandwidths : 0% fluctuation, 10% fluctuation, 20% fluctuation,..., 90% fluctuation.
         observation_spec = [10] * (self.iotDeviceNum + self.edgeDeviceNum)
-        self.observation_space = spaces.Box(low=0.0, high=20.0, shape=(self.iotDeviceNum + self.edgeDeviceNum,),
-                                            dtype=np.float32, seed=1)
+        self.observation_space = spaces.MultiDiscrete(observation_spec)
 
     def rewardFun(self, action):
         allTrainingTimes = []
@@ -160,13 +165,16 @@ class CustomEnv(gym.Env):
         self.rewardOfTrainingTime = (1 - self.fraction) * rewardOfTrainingTime
 
         if self.fraction <= 1:
-            reward = (self.fraction * rewardOfEnergy) + ((1 - self.fraction) * rewardOfTrainingTime)
+            reward = self.rewardOfEnergy + self.rewardOfTrainingTime
         else:
             raise Exception("Fraction must be less than 1")
 
         self.timestep_energy.append(averageEnergyConsumption)
         self.timestep_tt.append(maxTrainingTime)
         self.timestep_reward.append(reward)
+        self.timestep_energy_reward.append(self.rewardOfEnergy)
+        self.timestep_tt_reward.append(self.rewardOfTrainingTime)
+
         logger.info(f"Current ClassicFL Energy: {self.currentClassicFLEnergy}\n")
         logger.info(f"Current ClassicFL TrainingTime: {self.currentClassicFLTrainingTime}\n")
         logger.info(f"Average Energy : {averageEnergyConsumption} \n")
@@ -208,19 +216,22 @@ class CustomEnv(gym.Env):
 
     def reset(self, seed=1, options=None):
         super().reset(seed=seed)
-        if (self.getCurrentTimestep() != self.ep_length - 1) and self.currentEpisode != 0:
-            print(f"BE GA RAFTIM. timestep:{self.getCurrentTimestep()} ============================>>>>>")
         if self.currentEpisode != 0:
             self.setCurrentTimestep(0)
             self.episode_energy.append(sum(self.timestep_energy) / self.ep_length)
             self.episode_tt.append(sum(self.timestep_tt) / self.ep_length)
+
             self.episode_reward.append(sum(self.timestep_reward) / self.ep_length)
+            self.episode_energy_reward.append(sum(self.timestep_energy_reward) / self.ep_length)
+            self.episode_tt_reward.append(sum(self.timestep_tt_reward) / self.ep_length)
 
         self.currentEpisode += 1
         self.num_resets += 1
         self.timestep_tt = []
         self.timestep_energy = []
         self.timestep_reward = []
+        self.timestep_tt_reward = []
+        self.timestep_energy_reward = []
 
         self.setCumulativeEnergy(0)
         self.setCumulativeTT(0)

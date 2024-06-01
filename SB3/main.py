@@ -40,7 +40,6 @@ def mainRunner():
                     summaries=options['summaries'], log=options['log'], batch_size=int(options['batchSize']),
                     lr=float(options['learningRate']), n_step=int(options['numSteps']), clip=float(options['clip']))
     runner.run()
-    runner.evaluation()
 
 
 if __name__ == '__main__':
