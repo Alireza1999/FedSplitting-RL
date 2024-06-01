@@ -1,4 +1,11 @@
 # Importing required libraries
+import sys
+from pathlib import Path
+
+ROOT_DIR = Path.cwd().parent
+print(ROOT_DIR)
+sys.path.append(f"{ROOT_DIR}")
+
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.types import ReplyKeyboardMarkup
