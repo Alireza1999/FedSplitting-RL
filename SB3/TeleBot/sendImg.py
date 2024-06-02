@@ -3,8 +3,8 @@ import sys
 from pathlib import Path
 import os
 
-ROOT_DIR = Path.cwd().parent
-print(ROOT_DIR)
+ROOT_DIR = Path.cwd().parent.parent
+
 sys.path.append(f"{ROOT_DIR}")
 import utils
 from aiogram import Bot, Dispatcher, executor, types
@@ -36,8 +36,8 @@ async def welcome(message: types.Message):
 async def check_rp(message: types.Message):
     if message.text == 'See all saved config':
         # Responding with a message for the first button
-        configNum, configs = utils.readConfigList(f"{ROOT_DIR}/Graphs/configList")
-        print(configNum)
+        configNum, configs = utils.readConfigList(f"{ROOT_DIR}/SB3/Graphs/configList")
+      
         buttons = []
         for i in range(configNum):
             buttons.append([KeyboardButton(str(f"Config ID: {i + 1}"), hide_keyboard=True)])
@@ -45,10 +45,10 @@ async def check_rp(message: types.Message):
         await message.reply(configs, reply_markup=selectConfigKey)
 
     elif "Config ID" in message.text:
-        await message.reply(f"Sending Photos of config ID {message.text[9:].strip()}...")
+        await message.reply(f"Sending Photos of config ID {message.text[10:].strip()}...")
         configID = str(message.text[10:]).strip()
-        print(configID)
-        path = f'{ROOT_DIR}/Graphs/{configID}/'
+       
+        path = f'{ROOT_DIR}/SB3/Graphs/{configID}/'
 
         files = []
         # r=root, d=directories, f = files
