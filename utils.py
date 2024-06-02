@@ -17,7 +17,46 @@ from entities.Device_bandwidthState import Device as Device
 # from entities.Device import Device
 
 def saveGraphs(savePath, energy, trainingTime, reward, rewardOfEnergy, rewardOfTrainingTime, x, allEnergy,
-               allTrainingTime):
+               allTrainingTime, classicFL_energy, classicFL_trainingTime):
+    draw_graph(title="Energy vs Episode",
+               xlabel="Episode",
+               ylabel="Energy",
+               figSizeX=10,
+               figSizeY=5,
+               x=x,
+               y=energy,
+               y_2=classicFL_energy,
+               y_1_label="Our Method",
+               y_2_label="Classic FL",
+               savePath=savePath,
+               pictureName=f"energy_episode")
+
+    draw_graph(title="Training Time vs Episode",
+               xlabel="Episode",
+               ylabel="Training Time",
+               figSizeX=10,
+               figSizeY=5,
+               x=x,
+               y=trainingTime,
+               y_2=classicFL_trainingTime,
+               y_1_label="Our Method",
+               y_2_label="Classic FL",
+               savePath=savePath,
+               pictureName=f"trainingTime_episode")
+
+    # draw_graph(title="Training Time vs Episode",
+    #            xlabel="Episode",
+    #            ylabel="Training Time",
+    #            figSizeX=10,
+    #            figSizeY=5,
+    #            x=x,
+    #            y=trainingTime,
+    #            y_2=classicFL_trainingTime,
+    #            y_1_label="Our Method",
+    #            y_2_lable="Classic FL",
+    #            savePath=savePath,
+    #            pictureName=f"trainingTime_episode")
+
     draw_graph(title="Reward vs Episode",
                xlabel="Episode",
                ylabel="Reward",
@@ -28,25 +67,25 @@ def saveGraphs(savePath, energy, trainingTime, reward, rewardOfEnergy, rewardOfT
                savePath=savePath,
                pictureName=f"reward_episode")
 
-    draw_graph(title="Avg Energy vs Episode",
-               xlabel="Episode",
-               ylabel="Average Energy",
-               figSizeX=10,
-               figSizeY=5,
-               x=x,
-               y=energy,
-               savePath=savePath,
-               pictureName=f"energy_episode")
+    # draw_graph(title="Avg Energy vs Episode",
+    #            xlabel="Episode",
+    #            ylabel="Average Energy",
+    #            figSizeX=10,
+    #            figSizeY=5,
+    #            x=x,
+    #            y=energy,
+    #            savePath=savePath,
+    #            pictureName=f"energy_episode")
 
-    draw_graph(title="Avg TrainingTime vs Episode",
-               xlabel="Episode",
-               ylabel="TrainingTime",
-               figSizeX=10,
-               figSizeY=5,
-               x=x,
-               y=trainingTime,
-               savePath=savePath,
-               pictureName=f"training_time_episode")
+    # draw_graph(title="Avg TrainingTime vs Episode",
+    #            xlabel="Episode",
+    #            ylabel="TrainingTime",
+    #            figSizeX=10,
+    #            figSizeY=5,
+    #            x=x,
+    #            y=trainingTime,
+    #            savePath=savePath,
+    #            pictureName=f"training_time_episode")
 
     draw_scatter(title="Energy vs TrainingTime",
                  xlabel="Energy",
@@ -144,7 +183,7 @@ def checkSummaryAndSaveConfig(configPath: str, summary: dict):
 
 def createAgent(env, lr, clip, batch_size, n_step, agentType='ppo'):
     if agentType == 'ppo':
-        return PPO("MlpPolicy", env, learning_rate=linear_schedule(lr), verbose=2, clip_range=clip,
+        return PPO("MlpPolicy", env, learning_rate=lr, verbose=2, clip_range=clip,
                    gamma=1.0, batch_size=batch_size, n_steps=n_step, device="cpu")
     elif agentType == 'ac':
         return A2C("MlpPolicy", env, learning_rate=linear_schedule(lr), verbose=2, gamma=1.0,
@@ -180,20 +219,36 @@ def createDeviceFromCSV(csvFilePath: str, deviceType: str = 'cloud') -> list:
     return devices
 
 
-def draw_graph(figSizeX, figSizeY, x, y, title, xlabel, ylabel, savePath, pictureName, saveFig=True):
+def draw_graph(figSizeX, figSizeY, x, y, title, xlabel, ylabel, savePath, pictureName, y_1_label=None, y_2_label=None,
+               y_2=None,
+               saveFig=True):
     # Create a plot
-    plt.figure(figsize=(int(figSizeX), int(figSizeY)))  # Set the figure size
-    plt.plot(x, y)
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
 
-    if saveFig:
-        if not os.path.exists(savePath):
-            os.makedirs(savePath)
-        plt.savefig(os.path.join(savePath, pictureName))
-    plt.close()
-    # plt.show()
+    if y_2 is not None:
+        plt.figure(figsize=(int(10), int(5)))
+        plt.plot(x, y, color='red', label=y_1_label)
+        plt.plot(x, y_2, color='blue', label=y_2_label)
+        plt.legend()
+        plt.title(title)
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+        if saveFig:
+            if not os.path.exists(savePath):
+                os.makedirs(savePath)
+            plt.savefig(os.path.join(savePath, pictureName))
+        plt.close()
+    else:
+        plt.figure(figsize=(int(figSizeX), int(figSizeY)))  # Set the figure size
+        plt.plot(x, y)
+        plt.title(title)
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+
+        if saveFig:
+            if not os.path.exists(savePath):
+                os.makedirs(savePath)
+            plt.savefig(os.path.join(savePath, pictureName))
+        plt.close()
 
 
 def draw_hist(x, title, xlabel, savePath, pictureName, saveFig=True):

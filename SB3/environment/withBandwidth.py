@@ -49,12 +49,16 @@ class CustomEnv(gym.Env):
         self.trainingTimeOfComputation = 0
         self.trainingTimeOfCommunication = 0
 
+        self.timestep_classicFL_energy = []
+        self.timestep_classicFL_TT = []
         self.timestep_energy = []
         self.timestep_tt = []
         self.timestep_reward = []
         self.timestep_energy_reward = []
         self.timestep_tt_reward = []
 
+        self.episode_classicFL_energy = []
+        self.episode_classicFL_TT = []
         self.episode_energy = []
         self.episode_tt = []
         self.episode_reward = []
@@ -72,8 +76,10 @@ class CustomEnv(gym.Env):
         self.action_space = spaces.Box(low=0.0, high=1.0, shape=(2 * self.iotDeviceNum,), dtype=np.float32, seed=None)
 
         # bandwidths : 0% fluctuation, 10% fluctuation, 20% fluctuation,..., 90% fluctuation.
-        observation_spec = [10] * (self.iotDeviceNum + self.edgeDeviceNum)
-        self.observation_space = spaces.MultiDiscrete(observation_spec)
+        # observation_spec = [10] * (self.iotDeviceNum + self.edgeDeviceNum)
+        # self.observation_space = spaces.MultiDiscrete(observation_spec)
+        self.observation_space = spaces.Box(low=0.0, high=20, shape=(self.iotDeviceNum + self.edgeDeviceNum,),
+                                            dtype=np.float32, seed=None)
 
     def rewardFun(self, action):
         allTrainingTimes = []
@@ -169,6 +175,8 @@ class CustomEnv(gym.Env):
         else:
             raise Exception("Fraction must be less than 1")
 
+        self.timestep_classicFL_energy.append(self.currentClassicFLEnergy)
+        self.timestep_classicFL_TT.append(self.currentClassicFLTrainingTime)
         self.timestep_energy.append(averageEnergyConsumption)
         self.timestep_tt.append(maxTrainingTime)
         self.timestep_reward.append(reward)
@@ -220,7 +228,8 @@ class CustomEnv(gym.Env):
             self.setCurrentTimestep(0)
             self.episode_energy.append(sum(self.timestep_energy) / self.ep_length)
             self.episode_tt.append(sum(self.timestep_tt) / self.ep_length)
-
+            self.episode_classicFL_energy.append(sum(self.timestep_classicFL_energy) / self.ep_length)
+            self.episode_classicFL_TT.append(sum(self.timestep_classicFL_TT) / self.ep_length)
             self.episode_reward.append(sum(self.timestep_reward) / self.ep_length)
             self.episode_energy_reward.append(sum(self.timestep_energy_reward) / self.ep_length)
             self.episode_tt_reward.append(sum(self.timestep_tt_reward) / self.ep_length)
@@ -232,6 +241,8 @@ class CustomEnv(gym.Env):
         self.timestep_reward = []
         self.timestep_tt_reward = []
         self.timestep_energy_reward = []
+        self.timestep_classicFL_energy = []
+        self.timestep_classicFL_TT = []
 
         self.setCumulativeEnergy(0)
         self.setCumulativeTT(0)

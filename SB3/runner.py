@@ -55,6 +55,8 @@ class Runner:
         x = [i for i in range(int(self.total_time_step / 100))]
         reward = []
         rewardOfEnergy = []
+        classicFLEnergy = []
+        classicFLTT = []
         rewardOfTT = []
         tt = []
         energy = []
@@ -65,17 +67,22 @@ class Runner:
                 meanRewardOfTT = sum(env.episode_tt_reward[i - 100:i]) / 100
                 meanTT = sum(env.episode_tt[i - 100:i]) / 100
                 meanEnergy = sum(env.episode_energy[i - 100:i]) / 100
+                meanClassicFLEnergy = sum(env.episode_classicFL_energy[i - 100:i]) / 100
+                meanClassicFLTT = sum(env.episode_classicFL_TT[i - 100:i]) / 100
+
                 reward.append(meanReward)
                 rewardOfEnergy.append(meanRewardOfEnergy)
                 rewardOfTT.append(meanRewardOfTT)
                 tt.append(meanTT)
                 energy.append(meanEnergy)
-        print(reward)
-        print(rewardOfEnergy)
-        print(rewardOfTT)
-        utils.saveGraphs(saveGraphPath, energy=energy, rewardOfEnergy=rewardOfEnergy, rewardOfTrainingTime=rewardOfTT,
+                classicFLEnergy.append(meanClassicFLEnergy)
+                classicFLTT.append(meanClassicFLTT)
+
+        utils.saveGraphs(savePath=saveGraphPath, energy=energy, rewardOfEnergy=rewardOfEnergy,
+                         rewardOfTrainingTime=rewardOfTT,
                          trainingTime=tt, reward=reward, x=x, allEnergy=env.episode_energy,
-                         allTrainingTime=env.episode_tt)
+                         allTrainingTime=env.episode_tt, classicFL_trainingTime=classicFLTT,
+                         classicFL_energy=classicFLEnergy, )
         if isDuplicate:
             print("You have run an agent with this configuration before.")
             print(f"Pictures of new train version saved in folder: {folderName}")
@@ -83,11 +90,22 @@ class Runner:
             print(f"New Configuration added to configList.json with ID: {folderName}")
             print(f"Graphs was saved in folder: {folderName}")
 
-        self.evaluation(folderName)
+        self.evaluation(folderName=folderName, logger=logger, env=self.env)
 
-    def evaluation(self, folderName):
+    def evaluation(self, logger, env, folderName):
         from stable_baselines3.common.evaluation import evaluate_policy
-
         model = utils.loadAgent(env=self.env, agentType=self.agentType, agent_index=folderName)
-        mean_reward, std_reward = evaluate_policy(model, self.env, n_eval_episodes=100, deterministic=True)
-        print(f"mean_reward={mean_reward:.2f} +/- {std_reward}")
+        logger.info("Evaluation Started")
+
+        for i in range(100):
+            logger.info(f"---------------------------------")
+            observation = env.reset()
+            logger.info(f"State: {observation}")
+            actions, states = model.predict(observation=observation, deterministic=True)
+            new_observations, rewards, dones, infos = env.step(actions)
+            logger.info(f"Action: {actions}")
+            utils.actionToLayer()
+            logger.info(f"Reward: {rewards}")
+
+        # mean_reward, std_reward = evaluate_policy(model, self.env, n_eval_episodes=100, deterministic=True)
+        # print(f"mean_reward={mean_reward:.2f} +/- {std_reward}")
