@@ -14,7 +14,7 @@ from aiogram.types import ReplyKeyboardMarkup
 from config import BOT_TOKEN
 
 # Put the token that you received from BotFather in the quotes
-bot = Bot(token=BOT_TOKEN)
+bot = Bot(token=BOT_TOKEN, proxy='http://127.0.0.1:10809/')
 
 # Initializing the dispatcher object
 dp = Dispatcher(bot)
