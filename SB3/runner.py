@@ -1,5 +1,7 @@
 import sys
 
+import numpy as np
+
 import utils
 from SB3.environment.withBandwidth import CustomEnv
 from config import ROOT_DIR
@@ -50,9 +52,31 @@ class Runner:
         model.learn(total_timesteps=self.total_time_step)
         model.save(f"{ROOT_DIR}/SB3/models/{folderName}")
 
+        self.evaluation(folderName=folderName, logger=logger, env=self.env)
+        if isDuplicate:
+            print("You have run an agent with this configuration before.")
+            print(f"Pictures of new train version saved in folder: {folderName}")
+        else:
+            print(f"New Configuration added to configList.json with ID: {folderName}")
+            print(f"Graphs was saved in folder: {folderName}")
+
+    def evaluation(self, logger, env, folderName):
+        from stable_baselines3.common.evaluation import evaluate_policy
+        model = utils.loadAgent(env=self.env, agentType=self.agentType, agent_index=folderName)
+        logger.info("Evaluation Started")
+
+        for i in range(500):
+            logger.info(f"---------------------------------")
+            observation = env.reset()[0]
+            logger.info(f"State: {observation}")
+            actions, states = model.predict(observation=observation, deterministic=True)
+            new_observations, rewards, dones, infos, _ = env.step(actions)
+            logger.info(f"Action: {actions}")
+            logger.info(f"Reward: {rewards}")
+
         saveGraphPath = f"{ROOT_DIR}/SB3/Graphs/{folderName}"
 
-        x = [i for i in range(int(self.total_time_step / 100))]
+        x = [i for i in range(int((self.total_time_step+500) / 100))]
         reward = []
         rewardOfEnergy = []
         classicFLEnergy = []
@@ -83,29 +107,7 @@ class Runner:
                          trainingTime=tt, reward=reward, x=x, allEnergy=env.episode_energy,
                          allTrainingTime=env.episode_tt, classicFL_trainingTime=classicFLTT,
                          classicFL_energy=classicFLEnergy, )
-        if isDuplicate:
-            print("You have run an agent with this configuration before.")
-            print(f"Pictures of new train version saved in folder: {folderName}")
-        else:
-            print(f"New Configuration added to configList.json with ID: {folderName}")
-            print(f"Graphs was saved in folder: {folderName}")
 
-        self.evaluation(folderName=folderName, logger=logger, env=self.env)
-
-    def evaluation(self, logger, env, folderName):
-        from stable_baselines3.common.evaluation import evaluate_policy
-        model = utils.loadAgent(env=self.env, agentType=self.agentType, agent_index=folderName)
-        logger.info("Evaluation Started")
-
-        for i in range(100):
-            logger.info(f"---------------------------------")
-            observation = env.reset()
-            logger.info(f"State: {observation}")
-            actions, states = model.predict(observation=observation, deterministic=True)
-            new_observations, rewards, dones, infos = env.step(actions)
-            logger.info(f"Action: {actions}")
-            utils.actionToLayer()
-            logger.info(f"Reward: {rewards}")
 
         # mean_reward, std_reward = evaluate_policy(model, self.env, n_eval_episodes=100, deterministic=True)
         # print(f"mean_reward={mean_reward:.2f} +/- {std_reward}")
