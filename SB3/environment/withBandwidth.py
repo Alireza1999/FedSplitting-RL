@@ -196,12 +196,14 @@ class CustomEnv(gym.Env):
         edgeBandwidths = []
 
         for iotDevice in self.iotDevices:
-            randomBW = random.randint(1, 11)
-            iotBandwidths.append(iotDevice.bandwidth * randomBW * 0.1)
+            # randomBW = random.randint(1, 11)
+            # iotBandwidths.append(iotDevice.bandwidth * randomBW * 0.1)
+            iotBandwidths.append(iotDevice.bandwidth * round(random.uniform(0.1, 1.0), 10))
 
         for edgeDevice in self.edgeDevices:
-            randomBW = random.randint(1, 11)
-            edgeBandwidths.append(edgeDevice.bandwidth * randomBW * 0.1)
+            # randomBW = random.randint(1, 11)
+            # edgeBandwidths.append(edgeDevice.bandwidth * randomBW * 0.1)
+            edgeBandwidths.append(edgeDevice.bandwidth * round(random.uniform(0.1, 1.0), 10))
 
         newBW = np.concatenate((iotBandwidths, edgeBandwidths), axis=0)
         self.setBandwidth(newBW)
@@ -251,12 +253,14 @@ class CustomEnv(gym.Env):
         edgeBandwidths = []
 
         for iotDevice in self.iotDevices:
-            randomBW = random.randint(1, 11)
-            iotBandwidths.append(iotDevice.bandwidth * randomBW * 0.1)
+            # randomBW = random.randint(1, 11)
+            # iotBandwidths.append(iotDevice.bandwidth * randomBW * 0.1)
+            iotBandwidths.append(iotDevice.bandwidth * round(random.uniform(0.1, 1.0), 10))
 
         for edgeDevice in self.edgeDevices:
-            randomBW = random.randint(1, 11)
-            edgeBandwidths.append(edgeDevice.bandwidth * randomBW * 0.1)
+            # randomBW = random.randint(1, 11)
+            # edgeBandwidths.append(edgeDevice.bandwidth * randomBW * 0.1)
+            edgeBandwidths.append(edgeDevice.bandwidth * round(random.uniform(0.1, 1.0), 10))
 
         self.setBandwidth(bandwidth=np.concatenate((iotBandwidths, edgeBandwidths), axis=0))
 

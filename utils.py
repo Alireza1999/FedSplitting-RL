@@ -184,7 +184,7 @@ def checkSummaryAndSaveConfig(configPath: str, summary: dict):
 def createAgent(env, lr, clip, batch_size, n_step, agentType='ppo'):
     if agentType == 'ppo':
         return PPO("MlpPolicy", env, learning_rate=lr, verbose=2, clip_range=clip,
-                   gamma=1.0, batch_size=batch_size, n_steps=n_step, device="cpu")
+                   gamma=1.0, batch_size=batch_size, n_steps=n_step, device="cpu", n_epochs=1)
     elif agentType == 'ac':
         return A2C("MlpPolicy", env, learning_rate=linear_schedule(lr), verbose=2, gamma=1.0,
                    n_steps=n_step, device="auto")

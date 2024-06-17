@@ -1,14 +1,14 @@
 # Importing required libraries
+import os
 import sys
 from pathlib import Path
-import os
 
 ROOT_DIR = Path.cwd().parent.parent
 
 sys.path.append(f"{ROOT_DIR}")
 import utils
 from aiogram import Bot, Dispatcher, executor, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton
+from aiogram.types import KeyboardButton
 from aiogram.types import ReplyKeyboardMarkup
 
 from config import BOT_TOKEN
@@ -62,7 +62,6 @@ async def check_rp(message: types.Message):
 
     elif message.text == "Back":
         await message.reply("Configs", reply_markup=keyboard_reply)
-
 
 
 executor.start_polling(dp)
