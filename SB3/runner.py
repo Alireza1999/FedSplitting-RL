@@ -65,7 +65,7 @@ class Runner:
         model = utils.loadAgent(env=self.env, agentType=self.agentType, agent_index=folderName)
         logger.info("Evaluation Started")
 
-        for i in range(500):
+        for i in range(2000):
             logger.info(f"---------------------------------")
             observation = env.reset()[0]
             logger.info(f"State: {observation}")
@@ -76,7 +76,8 @@ class Runner:
 
         saveGraphPath = f"{ROOT_DIR}/SB3/Graphs/{folderName}"
 
-        x = [i for i in range(int((self.total_time_step+500) / 100))]
+        saveInterval = 200
+        x = [i for i in range(int((self.total_time_step+2000) / saveInterval))]
         reward = []
         rewardOfEnergy = []
         classicFLEnergy = []
@@ -85,14 +86,14 @@ class Runner:
         tt = []
         energy = []
         for i in range(len(env.episode_reward)):
-            if i % 100 == 0:
-                meanReward = sum(env.episode_reward[i - 100:i]) / 100
-                meanRewardOfEnergy = sum(env.episode_energy_reward[i - 100:i]) / 100
-                meanRewardOfTT = sum(env.episode_tt_reward[i - 100:i]) / 100
-                meanTT = sum(env.episode_tt[i - 100:i]) / 100
-                meanEnergy = sum(env.episode_energy[i - 100:i]) / 100
-                meanClassicFLEnergy = sum(env.episode_classicFL_energy[i - 100:i]) / 100
-                meanClassicFLTT = sum(env.episode_classicFL_TT[i - 100:i]) / 100
+            if i % saveInterval == 0:
+                meanReward = sum(env.episode_reward[i - saveInterval:i]) / saveInterval
+                meanRewardOfEnergy = sum(env.episode_energy_reward[i - saveInterval:i]) / saveInterval
+                meanRewardOfTT = sum(env.episode_tt_reward[i - saveInterval:i]) / saveInterval
+                meanTT = sum(env.episode_tt[i - saveInterval:i]) / saveInterval
+                meanEnergy = sum(env.episode_energy[i - saveInterval:i]) / saveInterval
+                meanClassicFLEnergy = sum(env.episode_classicFL_energy[i - saveInterval:i]) / saveInterval
+                meanClassicFLTT = sum(env.episode_classicFL_TT[i - saveInterval:i]) / saveInterval
 
                 reward.append(meanReward)
                 rewardOfEnergy.append(meanRewardOfEnergy)
