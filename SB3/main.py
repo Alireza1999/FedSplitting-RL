@@ -32,14 +32,17 @@ def parse_argument(parser: argparse.ArgumentParser(), arg: dict):
 
 
 def mainRunner():
-    parser = argparse.ArgumentParser()
-    options = parse_argument(parser=parser, arg=arguments)
+    # parser = argparse.ArgumentParser()
+    # options = parse_argument(parser=parser, arg=arguments)
+    #
+    # runner = Runner(agentType=options['agent'], episodeNum=int(options['episode']),
+    #                 timestepNum=int(options['timestep']), fraction=float(options['fraction']),
+    #                 summaries=options['summaries'], log=options['log'], batch_size=int(options['batchSize']),
+    #                 lr=float(options['learningRate']), n_step=int(options['numSteps']), clip=float(options['clip']))
+    # runner.run()
+    import util.nn_utils as utils
+    print(utils.train_model())
 
-    runner = Runner(agentType=options['agent'], episodeNum=int(options['episode']),
-                    timestepNum=int(options['timestep']), fraction=float(options['fraction']),
-                    summaries=options['summaries'], log=options['log'], batch_size=int(options['batchSize']),
-                    lr=float(options['learningRate']), n_step=int(options['numSteps']), clip=float(options['clip']))
-    runner.run()
 
 
 if __name__ == '__main__':

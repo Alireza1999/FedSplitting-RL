@@ -1,7 +1,7 @@
 from pathlib import Path
 
 COMP_WORK_LOAD = [884736, 0, 4718592, 0, 2359296, 524288, 1280]  # Computation workload for each layer (FLOP) VGG5 FLOPS
-LAYER_NUM = len(COMP_WORK_LOAD)  # Number of model Layer
+LAYER_NUM = len(COMP_WORK_LOAD)  # Number of models Layer
 SIZE_OF_PARAM = [12.501700401, 3.126700401, 6.251700401, 1.564199448, 1.564199448, 0.050506592]  # IN MB
 COMP_ENERGY_OF_LAYERS_clients = [5.2, 3.9, 13.1, 1.45, 3.24, 0.80, 0.46]
 COMP_TIME_OF_LAYERS_clients = [4.5, 2.5, 6.15, 2.0, 3.7, 1.8, 1.35]

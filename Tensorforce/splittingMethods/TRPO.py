@@ -21,7 +21,7 @@ def create(fraction, environment, timestepNum, saveSummariesPath):
         l2_regularization=0.1, entropy_regularization=0.1,
         memory=2200,
         # TensorFlow etc
-        # saver=dict(directory='model', filename='model'),
+        # saver=dict(directory='models', filename='models'),
         summarizer=dict(directory=f"{saveSummariesPath}/summaries/tensorforce_{fraction}",
                         frequency=50,
                         labels='all',

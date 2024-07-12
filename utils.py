@@ -142,7 +142,7 @@ def createSummaryFromModel(model, lr, fraction, agentType, clip, episodeNum, tim
 
 def checkSummaryAndSaveConfig(configPath: str, summary: dict):
     """ First, this function check that new summary has been saved before or not
-    If we ran model with this config before, so it does not save new config
+    If we ran models with this config before, so it does not save new config
     but if it was new config we'll create new config record and we wll save picture """
 
     isDuplicate = False

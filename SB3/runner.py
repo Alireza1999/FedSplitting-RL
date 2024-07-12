@@ -1,7 +1,5 @@
 import sys
 
-import numpy as np
-
 import utils
 from SB3.environment.withBandwidth import CustomEnv
 from config import ROOT_DIR
@@ -29,6 +27,7 @@ class Runner:
         self.env = None
 
     def run(self):
+        logger = None
         iotDevices = utils.createDeviceFromCSV(csvFilePath=f"{ROOT_DIR}/envs_stats/iotDevices.csv",
                                                deviceType='iotDevice')
         edgeDevices = utils.createDeviceFromCSV(csvFilePath=f"{ROOT_DIR}/envs_stats/edges.csv")
@@ -61,7 +60,6 @@ class Runner:
             print(f"Graphs was saved in folder: {folderName}")
 
     def evaluation(self, logger, env, folderName):
-        from stable_baselines3.common.evaluation import evaluate_policy
         model = utils.loadAgent(env=self.env, agentType=self.agentType, agent_index=folderName)
         logger.info("Evaluation Started")
 
@@ -109,6 +107,5 @@ class Runner:
                          allTrainingTime=env.episode_tt, classicFL_trainingTime=classicFLTT,
                          classicFL_energy=classicFLEnergy, )
 
-
-        # mean_reward, std_reward = evaluate_policy(model, self.env, n_eval_episodes=100, deterministic=True)
+        # mean_reward, std_reward = evaluate_policy(models, self.env, n_eval_episodes=100, deterministic=True)
         # print(f"mean_reward={mean_reward:.2f} +/- {std_reward}")

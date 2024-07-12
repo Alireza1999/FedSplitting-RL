@@ -68,7 +68,7 @@ class Device:
     #                 # if remainingFlops < 0 and splitPoints[1] < config.LAYER_NUM - 1:
     #                 #     computationTime *= (1 + abs(remainingFlops) / 100)
     #
-    #         # End of epoch and sending model to cloud
+    #         # End of epoch and sending models to cloud
     #         if self.deviceType == 'iotDevice':
     #             sizeOfDataTransferred = sum(config.SIZE_OF_PARAM[:splitPoints[0]])
     #             communicationTime += sizeOfDataTransferred / self.effectiveBandwidth
@@ -131,7 +131,7 @@ class Device:
                     computationTime += compWorkLoad / (self.FLOPS / self.connectedDevice)
                 # if remainingFlops < 0 and splitPoints[1] < config.LAYER_NUM - 1:
                 #     computationTime *= (1 + abs(remainingFlops) / 100)
-            # End of epoch and sending model to cloud
+            # End of epoch and sending models to cloud
             if self.deviceType == 'iotDevice':
                 sizeOfDataTransferred = sum(config.SIZE_OF_PARAM[:splitPoints[0]])
                 communicationTime += sizeOfDataTransferred / self.effectiveBandwidth
