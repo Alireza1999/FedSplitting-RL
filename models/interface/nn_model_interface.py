@@ -69,7 +69,6 @@ class NNModel(ABC, nn.Module):
         elif self.location == 'Edge':
             cfg = cfg[self.split_layer[0] + 1:self.split_layer[1] + 1]
 
-        #  TODO fill the featured and dense based on your model configuration
         nn.Sequential(*features), nn.Sequential(*denses)
 
     @abstractmethod
