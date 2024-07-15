@@ -78,7 +78,7 @@ class CustomEnv(gym.Env):
         # bandwidths : 0% fluctuation, 10% fluctuation, 20% fluctuation,..., 90% fluctuation.
         # observation_spec = [10] * (self.iotDeviceNum + self.edgeDeviceNum)
         # self.observation_space = spaces.MultiDiscrete(observation_spec)
-        self.observation_space = spaces.Box(low=0.0, high=20, shape=(self.iotDeviceNum + self.edgeDeviceNum,),
+        self.observation_space = spaces.Box(low=0.0, high=100, shape=(self.iotDeviceNum + self.edgeDeviceNum,),
                                             dtype=np.float32, seed=None)
 
     def rewardFun(self, action):
@@ -196,19 +196,38 @@ class CustomEnv(gym.Env):
         edgeBandwidths = []
 
         for iotDevice in self.iotDevices:
-            # randomBW = random.randint(1, 11)
-            # iotBandwidths.append(iotDevice.bandwidth * randomBW * 0.1)
-            iotBandwidths.append(iotDevice.bandwidth * round(random.uniform(0.1, 1.0), 10))
+            probability = round(random.uniform(0.0, 1.0), 2)
+            if probability <= 0.2:
+                iotBandwidths.append((iotDevice.bandwidth * round(random.uniform(0.1, 0.2), 10)))
+            elif 0.2 < probability <= 0.4:
+                iotBandwidths.append((iotDevice.bandwidth * round(random.uniform(0.2, 0.4), 10)))
+            elif 0.4 < probability <= 0.6:
+                iotBandwidths.append((iotDevice.bandwidth * round(random.uniform(0.4, 0.6), 10)))
+            elif 0.6 < probability <= 0.8:
+                iotBandwidths.append((iotDevice.bandwidth * round(random.uniform(0.6, 0.8), 10)))
+            else:
+                iotBandwidths.append((iotDevice.bandwidth * round(random.uniform(0.8, 1.0), 10)))
 
         for edgeDevice in self.edgeDevices:
-            # randomBW = random.randint(1, 11)
-            # edgeBandwidths.append(edgeDevice.bandwidth * randomBW * 0.1)
-            edgeBandwidths.append(edgeDevice.bandwidth * round(random.uniform(0.1, 1.0), 10))
+            probability = round(random.uniform(0.0, 1.0), 2)
+            if probability <= 0.2:
+                edgeBandwidths.append((edgeDevice.bandwidth * round(random.uniform(0.1, 0.2), 10)))
+            elif 0.2 < probability <= 0.4:
+                edgeBandwidths.append((edgeDevice.bandwidth * round(random.uniform(0.2, 0.4), 10)))
+            elif 0.4 < probability <= 0.6:
+                edgeBandwidths.append((edgeDevice.bandwidth * round(random.uniform(0.4, 0.6), 10)))
+            elif 0.6 < probability <= 0.8:
+                edgeBandwidths.append((edgeDevice.bandwidth * round(random.uniform(0.6, 0.8), 10)))
+            else:
+                edgeBandwidths.append((edgeDevice.bandwidth * round(random.uniform(0.8, 1.0), 10)))
 
         newBW = np.concatenate((iotBandwidths, edgeBandwidths), axis=0)
         self.setBandwidth(newBW)
 
-        self.currentState = self.getBandwidth()
+        self.currentState = []
+        for i in range(len(self.getBandwidth())):
+            self.currentState.append(self.getBandwidth()[i] / 100)
+
         logger.info(f"New State: {self.currentState}")
         return reward, self.currentState
 
@@ -253,18 +272,37 @@ class CustomEnv(gym.Env):
         edgeBandwidths = []
 
         for iotDevice in self.iotDevices:
-            # randomBW = random.randint(1, 11)
-            # iotBandwidths.append(iotDevice.bandwidth * randomBW * 0.1)
-            iotBandwidths.append(iotDevice.bandwidth * round(random.uniform(0.1, 1.0), 10))
+            probability = round(random.uniform(0.0, 1.0), 2)
+            if probability <= 0.2:
+                iotBandwidths.append((iotDevice.bandwidth * round(random.uniform(0.1, 0.2), 10)))
+            elif 0.2 < probability <= 0.4:
+                iotBandwidths.append((iotDevice.bandwidth * round(random.uniform(0.2, 0.4), 10)))
+            elif 0.4 < probability <= 0.6:
+                iotBandwidths.append((iotDevice.bandwidth * round(random.uniform(0.4, 0.6), 10)))
+            elif 0.6 < probability <= 0.8:
+                iotBandwidths.append((iotDevice.bandwidth * round(random.uniform(0.6, 0.8), 10)))
+            else:
+                iotBandwidths.append((iotDevice.bandwidth * round(random.uniform(0.8, 1.0), 10)))
 
         for edgeDevice in self.edgeDevices:
-            # randomBW = random.randint(1, 11)
-            # edgeBandwidths.append(edgeDevice.bandwidth * randomBW * 0.1)
-            edgeBandwidths.append(edgeDevice.bandwidth * round(random.uniform(0.1, 1.0), 10))
+            probability = round(random.uniform(0.0, 1.0), 2)
+            if probability <= 0.2:
+                edgeBandwidths.append((edgeDevice.bandwidth * round(random.uniform(0.1, 0.2), 10)))
+            elif 0.2 < probability <= 0.4:
+                edgeBandwidths.append((edgeDevice.bandwidth * round(random.uniform(0.2, 0.4), 10)))
+            elif 0.4 < probability <= 0.6:
+                edgeBandwidths.append((edgeDevice.bandwidth * round(random.uniform(0.4, 0.6), 10)))
+            elif 0.6 < probability <= 0.8:
+                edgeBandwidths.append((edgeDevice.bandwidth * round(random.uniform(0.6, 0.8), 10)))
+            else:
+                edgeBandwidths.append((edgeDevice.bandwidth * round(random.uniform(0.8, 1.0), 10)))
 
         self.setBandwidth(bandwidth=np.concatenate((iotBandwidths, edgeBandwidths), axis=0))
 
-        self.currentState = self.getBandwidth()
+        self.currentState = []
+        for i in range(len(self.getBandwidth())):
+            self.currentState.append(self.getBandwidth()[i] / 100)
+
         return self.currentState, {}
 
     def render(self):
