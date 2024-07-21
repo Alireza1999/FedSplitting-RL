@@ -78,7 +78,7 @@ class CustomEnv(gym.Env):
         # bandwidths : 0% fluctuation, 10% fluctuation, 20% fluctuation,..., 90% fluctuation.
         # observation_spec = [10] * (self.iotDeviceNum + self.edgeDeviceNum)
         # self.observation_space = spaces.MultiDiscrete(observation_spec)
-        self.observation_space = spaces.Box(low=0.0, high=100, shape=(self.iotDeviceNum + self.edgeDeviceNum,),
+        self.observation_space = spaces.Box(low=0.0, high=2, shape=(self.iotDeviceNum + self.edgeDeviceNum,),
                                             dtype=np.float32, seed=None)
 
     def rewardFun(self, action):
@@ -243,7 +243,7 @@ class CustomEnv(gym.Env):
             self.setCurrentTimestep(self.getCurrentTimestep() + 1)
         return observation, reward, terminated, truncated, {}
 
-    def reset(self, seed=1, options=None):
+    def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         if self.currentEpisode != 0:
             self.setCurrentTimestep(0)

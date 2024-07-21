@@ -183,6 +183,7 @@ def checkSummaryAndSaveConfig(configPath: str, summary: dict):
 
 
 def createAgent(env, lr, clip, batch_size, n_step, agentType='ppo'):
+    from models.rl_model.customMLP import CustomActorCriticPolicy
     if agentType == 'ppo':
         return PPO("MlpPolicy", env, learning_rate=lr, verbose=2, clip_range=clip,
                    gamma=1.0, batch_size=batch_size, n_steps=n_step, device="mps", n_epochs=100)
