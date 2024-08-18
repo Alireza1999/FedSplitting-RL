@@ -30,6 +30,7 @@ class CustomEnv(gym.Env):
         self.isEvaluation: bool = False
         self.maxEnergyOfIotDevice = [iot.remainingEnergy for iot in self.iotDevices]
 
+        self.rewardForm = ''
         self.currentClassicFLEnergy = 0
         self.currentClassicFLTrainingTime = 0
         self.currentRemainingEnergy = [iot.remainingEnergy for iot in self.iotDevices]
@@ -226,7 +227,7 @@ class CustomEnv(gym.Env):
                     consumedEnergy[sortedConsumedEnergyIndex[i]] != 0):
                 rewardOfRemainingEnergy += 5
             else:
-                rewardOfRemainingEnergy += -3
+                rewardOfRemainingEnergy += -5
 
         # rewardOfRemainingEnergy = min(max(rewardOfRemainingEnergy, -2), 5)
         remainingEnergyVariance = np.std(self.currentRemainingEnergy)
@@ -242,7 +243,12 @@ class CustomEnv(gym.Env):
         #     reward = 0
         # else:
         #     reward = 10
-        reward = rewYardOfRemainingEnergy
+
+        normRewardOfRemainingEnergy = utils.normalizeReward(maxAmount=15, minAmount=-15, x=rewardOfRemainingEnergy,
+                                                            maxNormalized=-1,
+                                                            minNormalized=1)
+        reward = normRewardOfRemainingEnergy + rewardOfEnergy
+
         # print(reward)
         # if self.fraction <= 1:
         #     reward = self.rewardOfEnergy + self.rewardOfTrainingTime + rewardOfRemainingEnergy
@@ -343,7 +349,7 @@ class CustomEnv(gym.Env):
             self.episode_consumedEnergy.append(copy.deepcopy(self.timestep_consumedEnergy))
             self.episode_effectiveBW.append(copy.deepcopy(self.timestep_effectiveBW))
 
-        if self.currentEpisode != 0:
+        if self.currentEpisode != 0 and self.getCurrentTimestep() != 0:
             self.episode_energy.append(sum(self.timestep_energy) / self.getCurrentTimestep())
             self.episode_tt.append(sum(self.timestep_tt) / self.getCurrentTimestep())
             self.episode_classicFL_energy.append(sum(self.timestep_classicFL_energy) / self.getCurrentTimestep())
