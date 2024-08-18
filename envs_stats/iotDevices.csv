@@ -1,6 +1,4 @@
-FLOPS,Bandwidth(MB/s),edgeNode,MaxPower(watt)
-500000,15,0,7.5
-500000,15,0,7.5
-500000,15,0,7.5
-500000,15,0,7.5
-500000,15,0,7.5
+FLOPS,Bandwidth(MB/s),edgeNode,MaxPower(watt),remainingEnergy (joule)
+500000,15,0,7.5,1200
+500000,15,0,7.5,1500
+500000,15,0,7.5,1900

@@ -3,26 +3,116 @@ import json
 import logging
 import os
 import random
+from collections import deque
 from typing import Callable
 
 import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
-from stable_baselines3 import PPO, A2C
+from stable_baselines3 import PPO, A2C, DDPG
 
 import config
-import utils
 from entities.Device_bandwidthState import Device as Device
 
 
 # from entities.Device import Device
+
+def round_robin_scheduling(clientInfo, time_slice: float = 0.01):
+    clientInfo = sorted(clientInfo, key=lambda x: x['start_time'])
+    #print("Client info at RR function util", clientInfo)
+
+    remaining_durations = dict()
+    waiting_times = dict()
+    turnaround_times = dict()
+    start_times = dict()
+    end_times = dict()
+    arrival_times = dict()
+
+    isOffloaded = list()
+    for i in range(len(clientInfo)):
+        if clientInfo[i]["duration"] != 0:
+            isOffloaded.append(clientInfo[i])
+            remaining_durations[f"{clientInfo[i]['name']}"] = clientInfo[i]["duration"]
+            waiting_times[f"{clientInfo[i]['name']}"] = 0
+            turnaround_times[f"{clientInfo[i]['name']}"] = 0
+            start_times[f"{clientInfo[i]['name']}"] = None
+            end_times[f"{clientInfo[i]['name']}"] = 0
+            arrival_times[f"{clientInfo[i]['name']}"] = clientInfo[i]["start_time"]
+        else:
+            turnaround_times[f"{clientInfo[i]['name']}"] = 0
+
+    clientInfo = isOffloaded
+    #print(isOffloaded)
+    # Queue to manage the round-robin scheduling
+    rr_queue = deque()
+
+    current_time = 0.00
+    total_execution_time = 0.00
+    conflict_time = 0.00
+
+    # Keep track of active processes
+    active_processes = set()
+
+    while remaining_durations or rr_queue or active_processes:
+        # print(current_time)
+        # print(remaining_durations)
+
+        # Add processes to the round-robin queue as they start
+        for process in clientInfo:
+            if process["start_time"] == current_time and process["name"] not in rr_queue:
+                rr_queue.append(process["name"])
+
+        # Process the round-robin queue
+        if rr_queue:
+            name = rr_queue.popleft()
+            if start_times[name] is None:
+                start_times[name] = current_time
+            actual_time_slice = round(min(time_slice, remaining_durations[name]), 2)
+            # actual_time_slice = time_slice
+
+            # Update waiting times for all processes in the queue
+            for process_name in rr_queue:
+                waiting_times[process_name] = round(waiting_times[process_name] + actual_time_slice, 2)
+
+                # Check for conflicts and update conflict time
+            if active_processes:
+                conflict_time = round(conflict_time + actual_time_slice * len(active_processes), 2)
+
+            # Update remaining duration
+            remaining_durations[name] -= actual_time_slice
+            remaining_durations[name] = round(remaining_durations[name], 2)
+
+            current_time = round(current_time + actual_time_slice, 2)
+
+            # If the process finishes, calculate its turnaround time and end time
+            if remaining_durations[name] <= 0.00:
+                turnaround_times[name] = round(current_time - arrival_times[name], 2)
+                end_times[name] = current_time
+                del remaining_durations[name]
+                #print("kire khar", active_processes)
+                active_processes.remove(name)
+            else:
+                active_processes.add(name)
+                rr_queue.append(name)
+
+        else:
+            # If the round-robin queue is empty, jump to the next start time
+            if remaining_durations:
+                next_start_time = min(arrival_times[name] for name in remaining_durations.keys())
+                current_time = next_start_time
+                continue
+
+        total_execution_time = current_time
+
+    return total_execution_time, conflict_time, waiting_times, turnaround_times, start_times, end_times
+
 
 def saveGraphs(savePath, energy, trainingTime, reward, rewardOfEnergy, rewardOfTrainingTime, x, allEnergy,
                allTrainingTime, classicFL_energy, classicFL_trainingTime):
     draw_graph(title="Energy vs Episode",
                xlabel="Episode",
                ylabel="Energy",
-               figSizeX=10,
+               figSizeX=25,
                figSizeY=5,
                x=x,
                y=energy,
@@ -35,7 +125,7 @@ def saveGraphs(savePath, energy, trainingTime, reward, rewardOfEnergy, rewardOfT
     draw_graph(title="Training Time vs Episode",
                xlabel="Episode",
                ylabel="Training Time",
-               figSizeX=10,
+               figSizeX=25,
                figSizeY=5,
                x=x,
                y=trainingTime,
@@ -61,7 +151,7 @@ def saveGraphs(savePath, energy, trainingTime, reward, rewardOfEnergy, rewardOfT
     draw_graph(title="Reward vs Episode",
                xlabel="Episode",
                ylabel="Reward",
-               figSizeX=10,
+               figSizeX=25,
                figSizeY=5,
                x=x,
                y=reward,
@@ -96,7 +186,7 @@ def saveGraphs(savePath, energy, trainingTime, reward, rewardOfEnergy, rewardOfT
                  savePath=savePath,
                  pictureName=f"energy_training_time_Scatter")
 
-    plt.figure(figsize=(int(10), int(5)))
+    plt.figure(figsize=(int(25), int(5)))
     plt.plot(x, rewardOfEnergy, color='red', label='Energy reward')
     plt.plot(x, rewardOfTrainingTime, color='green', label='TrainingTime reward')
     plt.plot(x, reward, color='blue', label='Total Reward')
@@ -128,15 +218,15 @@ def createSummaryFromModel(model, lr, fraction, agentType, clip, episodeNum, tim
     summary["sde_sample_freq"] = model_dict["sde_sample_freq"]
     summary["_stats_window_size"] = model_dict["_stats_window_size"]
     summary["_n_updates"] = model_dict["_n_updates"]
-    summary["n_steps"] = model_dict["n_steps"]
+    summary["n_steps"] = model_dict["n_steps"] if agentType != "ddpg" else None
     summary["gamma"] = model_dict["gamma"]
-    summary["gae_lambda"] = model_dict["gae_lambda"]
-    summary["ent_coef"] = model_dict["ent_coef"]
-    summary["vf_coef"] = model_dict["vf_coef"]
-    summary["max_grad_norm"] = model_dict["max_grad_norm"]
-    summary["n_epochs"] = model_dict["n_epochs"]
-    summary["normalize_advantage"] = model_dict["normalize_advantage"]
-    summary["target_kl"] = model_dict["target_kl"]
+    summary["gae_lambda"] = model_dict["gae_lambda"] if agentType != "ddpg" else None
+    summary["ent_coef"] = model_dict["ent_coef"] if agentType != "ddpg" else None
+    summary["vf_coef"] = model_dict["vf_coef"] if agentType != "ddpg" else None
+    summary["max_grad_norm"] = model_dict["max_grad_norm"] if agentType != "ddpg" else None
+    summary["n_epochs"] = model_dict["n_epochs"] if agentType != "ddpg" else None
+    summary["normalize_advantage"] = model_dict["normalize_advantage"] if agentType != "ddpg" else None
+    summary["target_kl"] = model_dict["target_kl"] if agentType != "ddpg" else None
     return summary
 
 
@@ -183,10 +273,11 @@ def checkSummaryAndSaveConfig(configPath: str, summary: dict):
 
 
 def createAgent(env, lr, clip, batch_size, n_step, agentType='ppo'):
-    from models.rl_model.customMLP import CustomActorCriticPolicy
     if agentType == 'ppo':
-        return PPO("MlpPolicy", env, learning_rate=lr, verbose=2, clip_range=clip,
-                   gamma=1.0, batch_size=batch_size, n_steps=n_step, device="mps", n_epochs=100)
+        return PPO("MlpPolicy", env, learning_rate=linear_schedule(lr), verbose=1, clip_range=clip,
+                   gamma=1.0, batch_size=batch_size, n_steps=n_step, device="mps", n_epochs=20, )
+    if agentType == 'ddpg':
+        return DDPG("MlpPolicy", env, learning_rate=lr, verbose=2, batch_size=batch_size, device="mps")
     elif agentType == 'ac':
         return A2C("MlpPolicy", env, learning_rate=linear_schedule(lr), verbose=2, gamma=1.0,
                    n_steps=n_step, device="auto")
@@ -194,14 +285,16 @@ def createAgent(env, lr, clip, batch_size, n_step, agentType='ppo'):
         raise Exception('Invalid config select from [ppo, ac, tensorforce, random]')
 
 
-def loadAgent(env, agentType, agent_index):
+def loadAgent(agentType, agent_index, env=None):
     loadPath = f"{config.ROOT_DIR}/SB3/models/{agent_index}"
     if agentType == 'ppo':
         return PPO.load(loadPath, env=env)
+    if agentType == 'ddpg':
+        return DDPG.load(loadPath, env=env)
     elif agentType == 'ac':
         return A2C.load(loadPath, env=env)
     else:
-        raise Exception('Invalid config select from [ppo, ac]')
+        raise Exception('Invalid config select from [ppo, ac, ddpg]')
 
 
 def createDeviceFromCSV(csvFilePath: str, deviceType: str = 'cloud') -> list:
@@ -213,7 +306,10 @@ def createDeviceFromCSV(csvFilePath: str, deviceType: str = 'cloud') -> list:
                 continue
             if deviceType == 'iotDevice':
                 device = Device(deviceType=deviceType, FLOPS=int(row[0]), bandwidth=float(row[1]),
-                                edgeIndex=int(row[2]), maxPower=float(row[3]))
+                                edgeIndex=int(row[2]), maxPower=float(row[3]), remainingEnergy=float(row[4]))
+            elif deviceType == 'edgeDevice':
+                device = Device(deviceType=deviceType, FLOPS=int(row[0]), bandwidth=float(row[1]),
+                                maxPower=float(row[2]))
             else:
                 device = Device(deviceType=deviceType, FLOPS=int(row[0]), bandwidth=float(row[1]),
                                 maxPower=float(row[2]))
@@ -227,7 +323,7 @@ def draw_graph(figSizeX, figSizeY, x, y, title, xlabel, ylabel, savePath, pictur
     # Create a plot
 
     if y_2 is not None:
-        plt.figure(figsize=(int(10), int(5)))
+        plt.figure(figsize=(int(figSizeX), int(figSizeY)))
         plt.plot(x, y, color='red', label=y_1_label)
         plt.plot(x, y_2, color='blue', label=y_2_label)
         plt.legend()

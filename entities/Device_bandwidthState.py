@@ -7,7 +7,7 @@ logger = logging.getLogger()
 
 class Device:
     def __init__(self, connectedDevice: int = 1, deviceType: str = 'cloud', edgeIndex: int = 0, FLOPS: int = 200,
-                 bandwidth: float = 2.0, maxPower: float = 15):
+                 bandwidth: float = 2.0, maxPower: float = 15, remainingEnergy: float =1000):
         # for Iot Device we use Edge index to find out each iot connected to which edge
         self.edgeIndex = int(edgeIndex)
         self.FLOPS = int(FLOPS)
@@ -16,6 +16,7 @@ class Device:
         self.deviceType = str(deviceType)
         self.connectedDevice = int(connectedDevice)
         self.effectiveBandwidth = self.bandwidth
+        self.remainingEnergy = remainingEnergy
 
     def setEffectiveBW(self, bw: float):
         self.effectiveBandwidth = bw
@@ -40,7 +41,7 @@ class Device:
                     sizeOfDataTransferred = numOfBatch * config.SIZE_OF_PARAM[splitPoints[0]]
                 communicationTime = sizeOfDataTransferred / self.effectiveBandwidth
 
-            elif self.deviceType == 'edge':
+            elif self.deviceType == 'edgeDevice':
                 compWorkLoad = sum(config.COMP_WORK_LOAD[splitPoints[0] + 1:splitPoints[1] + 1])
                 if self.connectedDevice != 0:
                     computationTime = numOfBatch * sum(

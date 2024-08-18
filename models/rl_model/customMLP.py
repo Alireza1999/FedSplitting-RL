@@ -31,11 +31,13 @@ class CustomNetwork(nn.Module):
 
         # Policy network
         self.policy_net = nn.Sequential(
-            nn.Linear(feature_dim, last_layer_dim_pi), nn.ReLU(),
+            nn.Linear(feature_dim, 7), nn.ReLU(), nn.Linear(7, 10), nn.ReLU(),
+            nn.Linear(10, 8), nn.ReLU(), nn.Linear(8, 10), nn.ReLU()
         )
         # Value network
         self.value_net = nn.Sequential(
-            nn.Linear(feature_dim, last_layer_dim_vf), nn.ReLU()
+            nn.Linear(feature_dim, 7), nn.ReLU(), nn.Linear(7, 10), nn.ReLU(),
+            nn.Linear(10, 8), nn.ReLU(), nn.Linear(8, 10), nn.ReLU()
         )
 
     def forward(self, features: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:
@@ -44,6 +46,12 @@ class CustomNetwork(nn.Module):
             If all layers are shared, then ``latent_policy == latent_value``
         """
         return self.policy_net(features), self.value_net(features)
+
+    def forward_actor(self, features: th.Tensor) -> th.Tensor:
+        return self.policy_net(features)
+
+    def forward_critic(self, features: th.Tensor) -> th.Tensor:
+        return self.value_net(features)
 
 
 class CustomActorCriticPolicy(ActorCriticPolicy):

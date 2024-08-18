@@ -12,6 +12,8 @@ arguments = {
            '[String] name of the RL agent[ppo, firstFit, ac, trpo]'],
     '-f': ['--fraction', 0.8, '[float] The fraction of energy and training time that is used for training RL'],
     '-lr': ['--learningRate', 0.003, '[float] The learning rate for RL'],
+    '-eval': ['--evaluation', False, '[Boolean] It indicates whether or not to just evaluate RL'],
+    '-model': ['--modelName', None, '[String] The name of the RL model to use'],
     '-b': ['--batchSize', 1000, '[int] The batch size for RL'],
     '-ns': ['--numSteps', 1000, '[int] The number of training steps for RL'],
     '-c': ['--clip', 0.3, '[float] The clipping value for RL'],
@@ -38,7 +40,8 @@ def mainRunner():
     runner = Runner(agentType=options['agent'], episodeNum=int(options['episode']),
                     timestepNum=int(options['timestep']), fraction=float(options['fraction']),
                     summaries=options['summaries'], log=options['log'], batch_size=int(options['batchSize']),
-                    lr=float(options['learningRate']), n_step=int(options['numSteps']), clip=float(options['clip']))
+                    lr=float(options['learningRate']), n_step=int(options['numSteps']), clip=float(options['clip']),
+                    justEval=options['evaluation'], modelName=options['modelName'])
     runner.run()
 
 
