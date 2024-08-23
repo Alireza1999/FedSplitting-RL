@@ -277,7 +277,7 @@ def createAgent(env, lr, clip, batch_size, n_step, agentType='ppo'):
                    gamma=1.0, batch_size=batch_size, n_steps=n_step, device="mps", n_epochs=20, )
     if agentType == 'ddpg':
         return DDPG("MlpPolicy", env, learning_rate=lr, verbose=2, batch_size=batch_size, device="mps",
-                    buffer_size=10_000_000, train_freq=(1, 'episode'), gradient_steps=-1)
+                    buffer_size=10_000_000, train_freq=(1, 'episode'))
     elif agentType == 'ac':
         return A2C("MlpPolicy", env, learning_rate=linear_schedule(lr), verbose=2, gamma=1.0,
                    n_steps=n_step, device="auto")
