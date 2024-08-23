@@ -177,6 +177,7 @@ class CustomEnv(gym.Env):
         totalEnergyConsumption = (total_comm_e + total_comp_e)
         averageEnergyConsumption = totalEnergyConsumption / self.iotDeviceNum
 
+        allTurnAroundTimeOnEdge = [0] * self.edgeDeviceNum
         # Phase 2: Calculate computation time in each edge considering Round-Robin scheduling in each edge
         allClient = []
         for i in range(self.edgeDeviceNum):
@@ -187,6 +188,7 @@ class CustomEnv(gym.Env):
             turnaround_times = list(turnaround_times.values())
             for j in range(len(clientInfo[f"edge{i}"])):
                 clientOfEdge[j]["training_time"] += turnaround_times[j]
+                allTurnAroundTimeOnEdge[i] += turnaround_times[j]
                 clientInfo[f"edge{i}"][j]["start_time"] = clientOfEdge[j]["training_time"]
             allClient = np.concatenate((allClient, clientInfo[f"edge{i}"]), axis=0)
 
@@ -244,10 +246,14 @@ class CustomEnv(gym.Env):
         #     reward = 10
 
         normRewardOfRemainingEnergy = utils.normalizeReward(maxAmount=75, minAmount=-75, x=rewardOfRemainingEnergy,
-                                                            maxNormalized=-5,
-                                                            minNormalized=5)
+                                                            maxNormalized=-1,
+                                                            minNormalized=1)
+        allTurnAroundTimeOnEdgeNorm = [
+            utils.normalizeReward(maxAmount=3000, minAmount=0, x=i, minNormalized=-1,
+                                  maxNormalized=1) for i in allTurnAroundTimeOnEdge]
+        rewardTurnaroundTime = sum(allTurnAroundTimeOnEdgeNorm)
 
-        reward = rewardOfRemainingEnergy
+        reward = normRewardOfRemainingEnergy + rewardTurnaroundTime
         # reward = normRewardOfRemainingEnergy + self.rewardOfEnergy
         # print(reward)
         # if self.fraction <= 1:
