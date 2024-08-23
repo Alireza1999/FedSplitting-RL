@@ -19,7 +19,7 @@ from entities.Device_bandwidthState import Device as Device
 
 def round_robin_scheduling(clientInfo, time_slice: float = 0.01):
     clientInfo = sorted(clientInfo, key=lambda x: x['start_time'])
-    #print("Client info at RR function util", clientInfo)
+    # print("Client info at RR function util", clientInfo)
 
     remaining_durations = dict()
     waiting_times = dict()
@@ -42,7 +42,7 @@ def round_robin_scheduling(clientInfo, time_slice: float = 0.01):
             turnaround_times[f"{clientInfo[i]['name']}"] = 0
 
     clientInfo = isOffloaded
-    #print(isOffloaded)
+    # print(isOffloaded)
     # Queue to manage the round-robin scheduling
     rr_queue = deque()
 
@@ -89,7 +89,6 @@ def round_robin_scheduling(clientInfo, time_slice: float = 0.01):
                 turnaround_times[name] = round(current_time - arrival_times[name], 2)
                 end_times[name] = current_time
                 del remaining_durations[name]
-                #print("kire khar", active_processes)
                 active_processes.remove(name)
             else:
                 active_processes.add(name)
@@ -277,7 +276,8 @@ def createAgent(env, lr, clip, batch_size, n_step, agentType='ppo'):
         return PPO("MlpPolicy", env, learning_rate=linear_schedule(lr), verbose=1, clip_range=clip,
                    gamma=1.0, batch_size=batch_size, n_steps=n_step, device="mps", n_epochs=20, )
     if agentType == 'ddpg':
-        return DDPG("MlpPolicy", env, learning_rate=lr, verbose=2, batch_size=batch_size, device="mps")
+        return DDPG("MlpPolicy", env, learning_rate=lr, verbose=2, batch_size=batch_size, device="mps",
+                    buffer_size=10_000_000, train_freq=(1, 'episode'), gradient_steps=-1)
     elif agentType == 'ac':
         return A2C("MlpPolicy", env, learning_rate=linear_schedule(lr), verbose=2, gamma=1.0,
                    n_steps=n_step, device="auto")
@@ -505,7 +505,7 @@ def randomSelectionSplitting(modelLen, deviceNumber) -> list:
     splittingForOneDevice = []
     for i in range(0, modelLen):
         for j in range(0, i + 1):
-            splittingForOneDevice.append([j, i])
+            splittingForOneDevice.appendq([j, i])
 
     result = []
     for i in range(deviceNumber):
