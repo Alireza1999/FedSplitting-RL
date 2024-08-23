@@ -93,7 +93,6 @@ class CustomEnv(gym.Env):
         # bandwidths : 0% fluctuation, 10% fluctuation, 20% fluctuation,..., 90% fluctuation.
         # observation_spec = [10] * (self.iotDeviceNum + self.edgeDeviceNum)
         # self.observation_space = spaces.MultiDiscrete(observation_spec)
-        self.observation_space = spaces.Dict()
         self.observation_space = spaces.Box(low=0.0, high=20,
                                             shape=(self.iotDeviceNum + self.edgeDeviceNum + self.iotDeviceNum,),
                                             dtype=np.float32, seed=None)
@@ -225,17 +224,17 @@ class CustomEnv(gym.Env):
         for i in range(len(consumedEnergy)):
             if ((sortedConsumedEnergyIndex[i] == clientsWithMinEnergy[i]) and
                     consumedEnergy[sortedConsumedEnergyIndex[i]] != 0):
-                rewardOfRemainingEnergy += 5
+                rewardOfRemainingEnergy += ((self.iotDeviceNum - i) * 5)
             else:
-                rewardOfRemainingEnergy += -5
+                rewardOfRemainingEnergy += ((self.iotDeviceNum - i) * -5)
 
         # rewardOfRemainingEnergy = min(max(rewardOfRemainingEnergy, -2), 5)
         remainingEnergyVariance = np.std(self.currentRemainingEnergy)
 
         self.avgEnergy = averageEnergyConsumption
         self.tt = maxTrainingTime
-        self.rewardOfEnergy = (self.fraction * rewardOfEnergy)
-        self.rewardOfTrainingTime = (1 - self.fraction) * rewardOfTrainingTime
+        self.rewardOfEnergy = 0 * rewardOfEnergy
+        self.rewardOfTrainingTime = 0 * rewardOfTrainingTime
 
         # if remainingEnergyVariance != 0:
         #     reward = (1 / remainingEnergyVariance) * 100
@@ -244,11 +243,12 @@ class CustomEnv(gym.Env):
         # else:
         #     reward = 10
 
-        normRewardOfRemainingEnergy = utils.normalizeReward(maxAmount=15, minAmount=-15, x=rewardOfRemainingEnergy,
-                                                            maxNormalized=-1,
-                                                            minNormalized=1)
-        reward = normRewardOfRemainingEnergy + rewardOfEnergy
+        normRewardOfRemainingEnergy = utils.normalizeReward(maxAmount=75, minAmount=-75, x=rewardOfRemainingEnergy,
+                                                            maxNormalized=-5,
+                                                            minNormalized=5)
 
+        reward = rewardOfRemainingEnergy
+        # reward = normRewardOfRemainingEnergy + self.rewardOfEnergy
         # print(reward)
         # if self.fraction <= 1:
         #     reward = self.rewardOfEnergy + self.rewardOfTrainingTime + rewardOfRemainingEnergy
@@ -271,6 +271,7 @@ class CustomEnv(gym.Env):
         logger.info(f"Reward of this action : {reward} \n")
         logger.info(f"Reward of energy : {self.rewardOfEnergy} \n")
         logger.info(f"Reward of training time : {self.rewardOfTrainingTime} \n")
+        logger.info(f"Reward of remaining energy : {normRewardOfRemainingEnergy} \n")
 
         if self.isEvaluation:
             self.timestep_remainingEnergy.append(copy.deepcopy(self.currentRemainingEnergy))
