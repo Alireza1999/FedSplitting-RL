@@ -8,7 +8,7 @@ sys.path.append(f"{ROOT_DIR}")
 
 
 class Runner:
-    def __init__(self, agentType='ppo', episodeNum=10000, timestepNum=1, fraction=1.0, batch_size=100, lr=0.003,
+    def __init__(self, agentType='ddpg', episodeNum=10000, timestepNum=1, fraction=1.0, batch_size=100, lr=0.003,
                  n_step=1000, clip=0.3, summaries=True, log=True, justEval=False, modelName=None):
         self.agentType = agentType
         self.episodeNum = episodeNum
@@ -40,7 +40,7 @@ class Runner:
             if self.modelName is not None:
                 folderName = self.modelName
                 logger = utils.createLog(fileName=f"SB3/Logs/{folderName}_eval")
-                self.evaluation(folderName=folderName, logger=logger, env=self.env)
+                self.evaluation(folderName=folderName, logger=logger, env=self.env, isEvaluation=True)
             else:
                 print("You should specify a model name")
         else:
@@ -68,7 +68,7 @@ class Runner:
                 print(f"New Configuration added to configList.json with ID: {folderName}")
                 print(f"Graphs was saved in folder: {folderName}")
 
-    def evaluation(self, logger, env, folderName):
+    def evaluation(self, logger, env, folderName, isEvaluation=False):
 
         saveGraphPath = f"{ROOT_DIR}/SB3/Graphs/{folderName}/"
         saveGraphPathEval = f"{ROOT_DIR}/SB3/Graphs/{folderName}/evaluations/"
@@ -122,20 +122,21 @@ class Runner:
         # meanClassicFLEnergy = sum(env.episode_classicFL_energy[i - saveInterval:i]) / saveInterval
         # meanClassicFLTT = sum(env.episode_classicFL_TT[i - saveInterval:i]) / saveInterval
 
-        x = [i for i in range(len(env.episode_reward))]
-        reward = (env.episode_reward)
-        rewardOfEnergy = (env.episode_energy_reward)
-        rewardOfTT = (env.episode_tt_reward)
-        tt = (env.episode_tt)
-        energy = (env.episode_energy)
-        classicFLEnergy = (env.episode_classicFL_energy)
-        classicFLTT = (env.episode_classicFL_TT)
+        if not isEvaluation:
+            x = [i for i in range(len(env.episode_reward))]
+            reward = (env.episode_reward)
+            rewardOfEnergy = (env.episode_energy_reward)
+            rewardOfTT = (env.episode_tt_reward)
+            tt = (env.episode_tt)
+            energy = (env.episode_energy)
+            classicFLEnergy = (env.episode_classicFL_energy)
+            classicFLTT = (env.episode_classicFL_TT)
 
-        utils.saveGraphs(savePath=saveGraphPath, energy=energy, rewardOfEnergy=rewardOfEnergy,
-                         rewardOfTrainingTime=rewardOfTT,
-                         trainingTime=tt, reward=reward, x=x, allEnergy=env.episode_energy,
-                         allTrainingTime=env.episode_tt, classicFL_trainingTime=classicFLTT,
-                         classicFL_energy=classicFLEnergy, )
+            utils.saveGraphs(savePath=saveGraphPath, energy=energy, rewardOfEnergy=rewardOfEnergy,
+                             rewardOfTrainingTime=rewardOfTT,
+                             trainingTime=tt, reward=reward, x=x, allEnergy=env.episode_energy,
+                             allTrainingTime=env.episode_tt, classicFL_trainingTime=classicFLTT,
+                             classicFL_energy=classicFLEnergy, )
 
         import matplotlib.pyplot as plt
         import random
