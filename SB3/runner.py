@@ -75,7 +75,7 @@ class Runner:
 
         model = utils.loadAgent(env=self.env, agentType=self.agentType, agent_index=folderName)
         logger.info("Evaluation Started")
-
+        print(f"Evaluation Started...")
         env.isEvaluation = True
         timestepReward = []
         episodeReward = []
@@ -143,12 +143,13 @@ class Runner:
         import os
 
         remainingEnergy = env.episode_remainingEnergy[1:]
+        remainingEnergyVariance = env.episode_remainingEnergyVariance[1:]
         iotBW = env.episode_effectiveBW[1:]
         assert len(iotBW) == len(remainingEnergy)
+
         for i in range(len(remainingEnergy)):
             x = [i for i in range(len(remainingEnergy[i]) - 1)]
             plt.figure(figsize=(int(25), int(5)))
-
             for k in range(env.iotDeviceNum):
                 iotDevice_K = []
                 for j in range(1, len(remainingEnergy[i])):
@@ -157,11 +158,16 @@ class Runner:
                 b = random.random()
                 g = random.random()
                 color = (r, g, b)
+                plt.subplot(2, 1, 1)
+                plt.title(f"Remaining Energy of iot device - episode {i}")
+                plt.xlabel("timestep")
+                plt.ylabel("remaining energy")
                 plt.plot(x, iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
                 plt.legend()
-            plt.title(f"Remaining Energy of iot device - episode {i}")
+            plt.subplot(2, 1, 2)
+            plt.plot(x, remainingEnergyVariance[i][:-1], color='black', linewidth='3', label=f"Variance")
             plt.xlabel("timestep")
-            plt.ylabel("remaining energy")
+            plt.ylabel("remaining energy variance")
             if not os.path.exists(saveGraphPathEval):
                 os.makedirs(saveGraphPathEval)
             plt.savefig(os.path.join(saveGraphPathEval, f"Remaining Energy - episode {i}"))
