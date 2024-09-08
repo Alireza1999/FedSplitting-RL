@@ -276,7 +276,7 @@ def checkSummaryAndSaveConfig(configPath: str, summary: dict):
 def createAgent(env, lr, clip, batch_size, n_step, agentType='ppo'):
     if agentType == 'ppo':
         return PPO("MlpPolicy", env, learning_rate=lr, verbose=1, clip_range=clip,
-                   gamma=1.0, batch_size=batch_size, n_steps=n_step, device="mps", ent_coef=0.1)
+                   gamma=1.0, batch_size=batch_size, n_steps=n_step, device="mps", ent_coef=0.3)
     elif agentType == 'ddpg':
         mean = np.array([0.3])
         sigma = np.array([0.2])
