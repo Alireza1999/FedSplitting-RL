@@ -48,6 +48,7 @@ class CustomEnv(gym.Env):
 
         self.rewardOfEnergy = 0
         self.rewardOfTrainingTime = 0
+        self.rewardOfRemainingEnergy = 0
 
         self.energyOfComputation = 0
         self.energyOfCommunication = 0
@@ -68,6 +69,7 @@ class CustomEnv(gym.Env):
         self.timestep_reward = []
         self.timestep_energy_reward = []
         self.timestep_tt_reward = []
+        self.timestep_remainingEnergy_reward = []
 
         self.episode_remainingEnergyVariance = []
         self.episode_effectiveBW = []
@@ -80,6 +82,7 @@ class CustomEnv(gym.Env):
         self.episode_reward = []
         self.episode_energy_reward = []
         self.episode_tt_reward = []
+        self.episode_remainingEnergy_reward = []
 
         self.effectiveBandwidth = []
 
@@ -205,19 +208,20 @@ class CustomEnv(gym.Env):
 
         maxTrainingTime = max(allClient, key=lambda x: x['training_time'])['training_time']
 
-        self.currentClassicFLEnergy, self.currentClassicFLTrainingTime = self.calculateClassicFLEnergyTT()
+        (self.currentClassicFLEnergy, self.currentClassicFLTrainingTime,
+         energyOfEachClientInClassicFL) = self.calculateClassicFLEnergyTT()
 
         rewardOfTrainingTime = maxTrainingTime
         rewardOfTrainingTime -= self.currentClassicFLTrainingTime
-        rewardOfTrainingTime /= 1200
+        rewardOfTrainingTime /= 100
         rewardOfTrainingTime *= -1
-        rewardOfTrainingTime = min(max(rewardOfTrainingTime, -1), 1)
+        rewardOfTrainingTime = min(max(rewardOfTrainingTime, -3), 3)
 
         rewardOfEnergy = averageEnergyConsumption
         rewardOfEnergy -= self.currentClassicFLEnergy
-        rewardOfEnergy /= 10
+        rewardOfEnergy /= 2.9
         rewardOfEnergy *= -1
-        rewardOfEnergy = min(max(rewardOfEnergy, -1), 1)
+        rewardOfEnergy = min(max(rewardOfEnergy, -3), 3)
 
         rewardOfRemainingEnergy = 0
         consumedEnergy = [a - b for a, b in zip(remainingEnergyBefore, self.currentRemainingEnergy)]
@@ -225,19 +229,31 @@ class CustomEnv(gym.Env):
         sortedConsumedEnergyIndex = sorted(range(len(consumedEnergy)), key=lambda k: consumedEnergy[k])
 
         for i in range(len(consumedEnergy)):
-            if ((sortedConsumedEnergyIndex[i] == clientsWithMinEnergy[i]) and
+            if ((consumedEnergy[sortedConsumedEnergyIndex[i]] <
+                 energyOfEachClientInClassicFL[sortedConsumedEnergyIndex[i]]) and
                     consumedEnergy[sortedConsumedEnergyIndex[i]] != 0):
-                rewardOfRemainingEnergy += ((self.iotDeviceNum - i) * 5)
+                rewardOfRemainingEnergy += 5
             else:
-                rewardOfRemainingEnergy += ((self.iotDeviceNum - i) * -5)
+                rewardOfRemainingEnergy -= 5
+
+            # if ((sortedConsumedEnergyIndex[i] == clientsWithMinEnergy[i]) and
+            #         consumedEnergy[sortedConsumedEnergyIndex[i]] != 0):
+            #     rewardOfRemainingEnergy += ((self.iotDeviceNum - i) * 5)
+            # else:
+            #     rewardOfRemainingEnergy += ((self.iotDeviceNum - i) * -5)
 
         # rewardOfRemainingEnergy = min(max(rewardOfRemainingEnergy, -2), 5)
         remainingEnergyVariance = np.std(self.currentRemainingEnergy)
 
         self.avgEnergy = averageEnergyConsumption
         self.tt = maxTrainingTime
-        self.rewardOfEnergy = 0 * rewardOfEnergy
-        self.rewardOfTrainingTime = 0 * rewardOfTrainingTime
+
+        normRewardOfRemainingEnergy = utils.normalizeReward(maxAmount=25, minAmount=-25, x=rewardOfRemainingEnergy,
+                                                            maxNormalized=-3,
+                                                            minNormalized=3)
+        self.rewardOfEnergy = 0.0 * rewardOfEnergy
+        self.rewardOfTrainingTime = 0.0 * rewardOfTrainingTime
+        self.rewardOfRemainingEnergy = 1.0 * normRewardOfRemainingEnergy
 
         # if remainingEnergyVariance != 0:
         #     reward = (1 / remainingEnergyVariance) * 100
@@ -246,16 +262,13 @@ class CustomEnv(gym.Env):
         # else:
         #     reward = 10
 
-        normRewardOfRemainingEnergy = utils.normalizeReward(maxAmount=75, minAmount=-75, x=rewardOfRemainingEnergy,
-                                                            maxNormalized=-3,
-                                                            minNormalized=3)
         allTurnAroundTimeOnEdgeNorm = [
             utils.normalizeReward(maxAmount=2700, minAmount=0, x=i, minNormalized=-1,
                                   maxNormalized=0) for i in allTurnAroundTimeOnEdge]
         rewardTurnaroundTime = sum(allTurnAroundTimeOnEdgeNorm)
 
         # reward = normRewardOfRemainingEnergy + rewardTurnaroundTime
-        reward = normRewardOfRemainingEnergy + rewardTurnaroundTime
+        reward = self.rewardOfRemainingEnergy + self.rewardOfEnergy + self.rewardOfTrainingTime
         # print(reward)
         # if self.fraction <= 1:
         #     reward = self.rewardOfEnergy + self.rewardOfTrainingTime + rewardOfRemainingEnergy
@@ -269,6 +282,7 @@ class CustomEnv(gym.Env):
         self.timestep_reward.append(reward)
         self.timestep_energy_reward.append(self.rewardOfEnergy)
         self.timestep_tt_reward.append(self.rewardOfTrainingTime)
+        self.timestep_remainingEnergy_reward.append(self.rewardOfRemainingEnergy)
 
         logger.info(f"Current ClassicFL Energy: {self.currentClassicFLEnergy}")
         logger.info(f"Current ClassicFL TrainingTime: {self.currentClassicFLTrainingTime}")
@@ -278,7 +292,7 @@ class CustomEnv(gym.Env):
         logger.info(f"Reward of this action : {reward}")
         logger.info(f"Reward of energy : {self.rewardOfEnergy}")
         logger.info(f"Reward of training time : {self.rewardOfTrainingTime}")
-        logger.info(f"Reward of remaining energy : {normRewardOfRemainingEnergy}")
+        logger.info(f"Reward of remaining energy : {self.rewardOfRemainingEnergy}")
 
         if self.isEvaluation:
             self.timestep_remainingEnergy.append(copy.deepcopy(self.currentRemainingEnergy))
@@ -367,6 +381,8 @@ class CustomEnv(gym.Env):
             self.episode_reward.append(sum(self.timestep_reward) / self.getCurrentTimestep())
             self.episode_energy_reward.append(sum(self.timestep_energy_reward) / self.getCurrentTimestep())
             self.episode_tt_reward.append(sum(self.timestep_tt_reward) / self.getCurrentTimestep())
+            self.episode_remainingEnergy_reward.append(
+                sum(self.timestep_remainingEnergy_reward) / self.getCurrentTimestep())
 
         self.setCurrentTimestep(0)
         self.currentEpisode += 1
@@ -376,6 +392,7 @@ class CustomEnv(gym.Env):
         self.timestep_reward = []
         self.timestep_tt_reward = []
         self.timestep_energy_reward = []
+        self.timestep_remainingEnergy_reward = []
         self.timestep_classicFL_energy = []
         self.timestep_classicFL_TT = []
         self.timestep_remainingEnergy = []
@@ -437,6 +454,7 @@ class CustomEnv(gym.Env):
 
     def calculateClassicFLEnergyTT(self):
         allTrainingTimes = []
+        energyOfEachClient = []
         offloadingPointsList = [config.LAYER_NUM - 1] * self.iotDeviceNum * 2
         total_comp_e = 0
         total_comm_e = 0
@@ -485,6 +503,7 @@ class CustomEnv(gym.Env):
             # computing energy consumption of iot devices
             total_comp_e += iot_comp_e
             total_comm_e += iot_comm_e
+            energyOfEachClient.append(iot_comp_e + iot_comm_e)
 
         # Average energy consumption calculation
         totalEnergyConsumption = (total_comm_e + total_comp_e)
@@ -514,7 +533,7 @@ class CustomEnv(gym.Env):
             allClient[i]["training_time"] += turnaround_times[i]
 
         maxTrainingTime = max(allClient, key=lambda x: x['training_time'])['training_time']
-        return averageEnergyConsumption, maxTrainingTime
+        return averageEnergyConsumption, maxTrainingTime, energyOfEachClient
 
     def close(self):
         super().close()

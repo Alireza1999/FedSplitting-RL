@@ -124,19 +124,20 @@ class Runner:
 
         if not isEvaluation:
             x = [i for i in range(len(env.episode_reward))]
-            reward = (env.episode_reward)
-            rewardOfEnergy = (env.episode_energy_reward)
-            rewardOfTT = (env.episode_tt_reward)
-            tt = (env.episode_tt)
-            energy = (env.episode_energy)
-            classicFLEnergy = (env.episode_classicFL_energy)
-            classicFLTT = (env.episode_classicFL_TT)
+            reward = env.episode_reward
+            rewardOfEnergy = env.episode_energy_reward
+            rewardOfTT = env.episode_tt_reward
+            rewardOfRemainingEnergy = env.episode_remainingEnergy_reward
+            tt = env.episode_tt
+            energy = env.episode_energy
+            classicFLEnergy = env.episode_classicFL_energy
+            classicFLTT = env.episode_classicFL_TT
 
             utils.saveGraphs(savePath=saveGraphPath, energy=energy, rewardOfEnergy=rewardOfEnergy,
                              rewardOfTrainingTime=rewardOfTT,
                              trainingTime=tt, reward=reward, x=x, allEnergy=env.episode_energy,
                              allTrainingTime=env.episode_tt, classicFL_trainingTime=classicFLTT,
-                             classicFL_energy=classicFLEnergy, )
+                             classicFL_energy=classicFLEnergy, rewardOfRemainingEnergy=rewardOfRemainingEnergy)
 
         import matplotlib.pyplot as plt
         import random
@@ -145,7 +146,6 @@ class Runner:
         remainingEnergy = env.episode_remainingEnergy[1:]
         remainingEnergyVariance = env.episode_remainingEnergyVariance[1:]
         iotBW = env.episode_effectiveBW[1:]
-        assert len(iotBW) == len(remainingEnergy)
 
         for i in range(len(remainingEnergy)):
             x = [i for i in range(len(remainingEnergy[i]) - 1)]

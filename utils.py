@@ -9,7 +9,7 @@ from typing import Callable
 import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
-from stable_baselines3 import PPO, A2C, DDPG
+from stable_baselines3 import PPO, A2C, DDPG, SAC
 
 import config
 from entities.Device_bandwidthState import Device as Device
@@ -106,7 +106,8 @@ def round_robin_scheduling(clientInfo, time_slice: float = 0.01):
     return total_execution_time, conflict_time, waiting_times, turnaround_times, start_times, end_times
 
 
-def saveGraphs(savePath, energy, trainingTime, reward, rewardOfEnergy, rewardOfTrainingTime, x, allEnergy,
+def saveGraphs(savePath, energy, trainingTime, reward, rewardOfEnergy, rewardOfTrainingTime, rewardOfRemainingEnergy, x,
+               allEnergy,
                allTrainingTime, classicFL_energy, classicFL_trainingTime):
     draw_graph(title="Energy vs Episode",
                xlabel="Episode",
@@ -187,7 +188,8 @@ def saveGraphs(savePath, energy, trainingTime, reward, rewardOfEnergy, rewardOfT
 
     plt.figure(figsize=(int(25), int(5)))
     plt.plot(x, rewardOfEnergy, color='red', label='Energy reward')
-    plt.plot(x, rewardOfTrainingTime, color='green', label='TrainingTime reward')
+    plt.plot(x, rewardOfTrainingTime, color='green', label='Training time reward')
+    plt.plot(x, rewardOfRemainingEnergy, color='yellow', label='Remaining energy reward')
     plt.plot(x, reward, color='blue', label='Total Reward')
     plt.legend()
     plt.title("All Reward Graphs")
@@ -217,15 +219,15 @@ def createSummaryFromModel(model, lr, fraction, agentType, clip, episodeNum, tim
     summary["sde_sample_freq"] = model_dict["sde_sample_freq"]
     summary["_stats_window_size"] = model_dict["_stats_window_size"]
     summary["_n_updates"] = model_dict["_n_updates"]
-    summary["n_steps"] = model_dict["n_steps"] if agentType != "ddpg" else None
+    summary["n_steps"] = model_dict["n_steps"] if agentType == "ppo" else None
     summary["gamma"] = model_dict["gamma"]
-    summary["gae_lambda"] = model_dict["gae_lambda"] if agentType != "ddpg" else None
-    summary["ent_coef"] = model_dict["ent_coef"] if agentType != "ddpg" else None
-    summary["vf_coef"] = model_dict["vf_coef"] if agentType != "ddpg" else None
-    summary["max_grad_norm"] = model_dict["max_grad_norm"] if agentType != "ddpg" else None
-    summary["n_epochs"] = model_dict["n_epochs"] if agentType != "ddpg" else None
-    summary["normalize_advantage"] = model_dict["normalize_advantage"] if agentType != "ddpg" else None
-    summary["target_kl"] = model_dict["target_kl"] if agentType != "ddpg" else None
+    summary["gae_lambda"] = model_dict["gae_lambda"] if agentType == "ppo" else None
+    summary["ent_coef"] = model_dict["ent_coef"] if agentType == "ppo" else None
+    summary["vf_coef"] = model_dict["vf_coef"] if agentType == "ppo" else None
+    summary["max_grad_norm"] = model_dict["max_grad_norm"] if agentType == "ppo" else None
+    summary["n_epochs"] = model_dict["n_epochs"] if agentType == "ppo" else None
+    summary["normalize_advantage"] = model_dict["normalize_advantage"] if agentType == "ppo" else None
+    summary["target_kl"] = model_dict["target_kl"] if agentType == "ppo" else None
     return summary
 
 
@@ -273,11 +275,16 @@ def checkSummaryAndSaveConfig(configPath: str, summary: dict):
 
 def createAgent(env, lr, clip, batch_size, n_step, agentType='ppo'):
     if agentType == 'ppo':
-        return PPO("MlpPolicy", env, learning_rate=linear_schedule(lr), verbose=1, clip_range=clip,
-                   gamma=1.0, batch_size=batch_size, n_steps=n_step, device="mps", n_epochs=20, )
-    if agentType == 'ddpg':
+        return PPO("MlpPolicy", env, learning_rate=lr, verbose=1, clip_range=clip,
+                   gamma=1.0, batch_size=batch_size, n_steps=n_step, device="mps", ent_coef=0.1)
+    elif agentType == 'ddpg':
+        mean = np.array([0.3])
+        sigma = np.array([0.2])
         return DDPG("MlpPolicy", env, learning_rate=lr, verbose=2, batch_size=batch_size, device="mps",
-                    buffer_size=10_000_000, train_freq=(1, 'episode'))
+                    buffer_size=10_000_000, gamma=1.0, seed=1234)
+    elif agentType == 'sac':
+        return SAC("MlpPolicy", env, learning_rate=linear_schedule(lr), verbose=2, batch_size=batch_size, device="mps",
+                   buffer_size=1_000_000, gamma=1.0, ent_coef='auto_0.1', use_sde=True)
     elif agentType == 'ac':
         return A2C("MlpPolicy", env, learning_rate=linear_schedule(lr), verbose=2, gamma=1.0,
                    n_steps=n_step, device="auto")
@@ -289,8 +296,10 @@ def loadAgent(agentType, agent_index, env=None):
     loadPath = f"{config.ROOT_DIR}/SB3/models/{agent_index}"
     if agentType == 'ppo':
         return PPO.load(loadPath, env=env)
-    if agentType == 'ddpg':
-        return DDPG.load(loadPath, env=env)
+    elif agentType == 'ddpg':
+        return DDPG.load(loadPath, env=env, print_system_info=True)
+    elif agentType == 'sac':
+        return SAC.load(loadPath, env=env, print_system_info=True)
     elif agentType == 'ac':
         return A2C.load(loadPath, env=env)
     else:
