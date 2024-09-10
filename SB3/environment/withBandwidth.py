@@ -227,28 +227,20 @@ class CustomEnv(gym.Env):
         consumedEnergy = [a - b for a, b in zip(remainingEnergyBefore, self.currentRemainingEnergy)]
         self.currentConsumedEnergy = consumedEnergy
         sortedConsumedEnergyIndex = sorted(range(len(consumedEnergy)), key=lambda k: consumedEnergy[k])
-
+        
         for i in range(len(consumedEnergy)):
-            if ((consumedEnergy[sortedConsumedEnergyIndex[i]] <
-                 energyOfEachClientInClassicFL[sortedConsumedEnergyIndex[i]]) and
+            if ((sortedConsumedEnergyIndex[i] == clientsWithMinEnergy[i]) and
                     consumedEnergy[sortedConsumedEnergyIndex[i]] != 0):
-                rewardOfRemainingEnergy += 5
+                rewardOfRemainingEnergy += ((self.iotDeviceNum - i) * 5)
             else:
-                rewardOfRemainingEnergy -= 5
+                rewardOfRemainingEnergy += ((self.iotDeviceNum - i) * -5)
 
-            # if ((sortedConsumedEnergyIndex[i] == clientsWithMinEnergy[i]) and
-            #         consumedEnergy[sortedConsumedEnergyIndex[i]] != 0):
-            #     rewardOfRemainingEnergy += ((self.iotDeviceNum - i) * 5)
-            # else:
-            #     rewardOfRemainingEnergy += ((self.iotDeviceNum - i) * -5)
-
-        # rewardOfRemainingEnergy = min(max(rewardOfRemainingEnergy, -2), 5)
         remainingEnergyVariance = np.std(self.currentRemainingEnergy)
 
         self.avgEnergy = averageEnergyConsumption
         self.tt = maxTrainingTime
 
-        normRewardOfRemainingEnergy = utils.normalizeReward(maxAmount=25, minAmount=-25, x=rewardOfRemainingEnergy,
+        normRewardOfRemainingEnergy = utils.normalizeReward(maxAmount=75, minAmount=-75, x=rewardOfRemainingEnergy,
                                                             maxNormalized=-3,
                                                             minNormalized=3)
         self.rewardOfEnergy = 0.0 * rewardOfEnergy
@@ -261,7 +253,7 @@ class CustomEnv(gym.Env):
         #     reward = 0
         # else:
         #     reward = 10
-
+        
         allTurnAroundTimeOnEdgeNorm = [
             utils.normalizeReward(maxAmount=2700, minAmount=0, x=i, minNormalized=-1,
                                   maxNormalized=0) for i in allTurnAroundTimeOnEdge]
@@ -269,6 +261,7 @@ class CustomEnv(gym.Env):
 
         # reward = normRewardOfRemainingEnergy + rewardTurnaroundTime
         reward = self.rewardOfRemainingEnergy + self.rewardOfEnergy + self.rewardOfTrainingTime
+
         # print(reward)
         # if self.fraction <= 1:
         #     reward = self.rewardOfEnergy + self.rewardOfTrainingTime + rewardOfRemainingEnergy

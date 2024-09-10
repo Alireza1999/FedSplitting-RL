@@ -1,18 +1,19 @@
-from typing import List, Tuple
+import os.path
+from typing import List
 
-import gymnasium as gym
 import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
 from IPython.display import clear_output
 from matplotlib import pyplot as plt
-
-from RL_Algorithm.Actor import Actor
-from RL_Algorithm.Critic import Critic
-from RL_Algorithm.OUNoise import OUNoise
-from RL_Algorithm.ReplayBuffer import ReplayBuffer
-
+import utils
+from RL_Algorithm.DDPG.network.Actor import Actor
+from RL_Algorithm.DDPG.network.Critic import Critic
+from RL_Algorithm.DDPG.utils.OUNoise import OUNoise
+from RL_Algorithm.DDPG.utils.ReplayBuffer import ReplayBuffer
+from SB3.environment.withBandwidth import CustomEnv
+from config import ROOT_DIR
 
 class DDPG:
     """DDPGAgent interacting with environment.
@@ -39,7 +40,7 @@ class DDPG:
 
     def __init__(
             self,
-            env: gym.Env,
+            env: CustomEnv,
             memory_size: int,
             batch_size: int,
             ou_noise_theta: float,
@@ -67,7 +68,7 @@ class DDPG:
         )
 
         # device: cpu / gpu
-        self.device = torch.device("cpu")
+        self.device = torch.device("mps")
         print(self.device)
 
         # networks
@@ -111,14 +112,13 @@ class DDPG:
 
         return selected_action
 
-    def step(self, action: np.ndarray) -> Tuple[np.ndarray, np.float64, bool]:
+    def step(self, action: np.ndarray):
         """Take an action and return the response of the env."""
         next_state, reward, done, _, _ = self.env.step(action)
 
         if not self.is_test:
             self.transition += [reward, next_state, done]
             self.memory.store(*self.transition)
-
         return next_state, reward, done
 
     def update_model(self) -> torch.Tensor:
@@ -203,24 +203,81 @@ class DDPG:
     def test(self):
         """Test the agent."""
         self.is_test = True
-
-        state = self.env.reset()
-        done = False
-        score = 0
+        self.env.unwrapped.isEvaluation = True
 
         frames = []
-        while not done:
-            frames.append(self.env.render(mode="rgb_array"))
-            action = self.select_action(state)
-            next_state, reward, done = self.step(action)
+        for i in range(10):
+            state, _ = self.env.reset()
+            score = 0
+            done = False
+            while not done:
+                # frames.append(self.env.render(mode="rgb_array"))
+                action = self.select_action(state)
+                next_state, reward, done = self.step(action)
 
-            state = next_state
-            score += reward
+                state = next_state
+                score += reward
+            print(f"score of episode {i}: ", score)
 
-        print("score: ", score)
+        remainingEnergy = self.env.unwrapped.episode_remainingEnergy[1:]
+        remainingEnergyVariance = self.env.unwrapped.episode_remainingEnergyVariance[1:]
+        iotBW = self.env.unwrapped.episode_effectiveBW[1:]
+        import random
+        for i in range(len(remainingEnergy)):
+            plt.figure(figsize=(int(25), int(5)))
+            for k in range(self.env.unwrapped.iotDeviceNum):
+                iotDevice_K = []
+                for j in range(1, len(remainingEnergy[i])):
+                    iotDevice_K.append(remainingEnergy[i][j][k])
+                r = random.random()
+                b = random.random()
+                g = random.random()
+                color = (r, g, b)
+                plt.subplot(2, 1, 1)
+                plt.title(f"Remaining Energy of iot device - episode {i}")
+                plt.xlabel("timestep")
+                plt.ylabel("remaining energy")
+                plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
+                plt.legend()
+            plt.subplot(2, 1, 2)
+            plt.plot(remainingEnergyVariance[i][:-1], color='black', linewidth='3', label=f"Variance")
+            plt.xlabel("timestep")
+            plt.ylabel("remaining energy variance")
+            plt.savefig(os.path.join(f"{ROOT_DIR}/DDPG/Graphs", f"Remaining Energy - episode {i}.png"))
+            plt.close()
+
+        consumedEnergy = self.env.unwrapped.episode_consumedEnergy[1:]
+        for i in range(len(consumedEnergy)):
+            color = []
+            plt.figure(figsize=(int(40), int(10)))
+            x = [i for i in range(len(consumedEnergy[i]) - 1)]
+            for k in range(self.env.unwrapped.iotDeviceNum):
+                actionIndex = k * 2
+                iotDevice_K = []
+                for j in range(1, len(consumedEnergy[i])):
+                    iotDevice_K.append(consumedEnergy[i][j][k])
+                r = random.random()
+                b = random.random()
+                g = random.random()
+                color.append((r, g, b))
+                plt.subplot(3, 1, 1)
+                plt.plot(x, iotDevice_K, color=color[k], marker='o', label=f"Device {k}")
+                plt.legend()
+                plt.ylabel("consumed energy")
+
+                iotDevice_K_BW = []
+                for j in range(1, len(iotBW[i])):
+                    iotDevice_K_BW.append(iotBW[i][j][k])
+                plt.subplot(3, 1, 2)
+                plt.plot(x, iotDevice_K_BW, color=color[k], linewidth='2', marker='o', label=f"BW of Device {k}")
+                plt.legend()
+                plt.ylabel("Bandwidth")
+            plt.title(f"Consumed Energy of iot device - episode {i}")
+            plt.xlabel("timestep")
+            plt.savefig(os.path.join(f"{ROOT_DIR}/DDPG/Graphs", f"Consumed Energy - episode {i}.png"))
+            plt.close()
+
         self.env.close()
-
-        return frames
 
     def _target_soft_update(self):
         """Soft-update: target = tau*local + (1-tau)*target."""
@@ -248,7 +305,10 @@ class DDPG:
         def subplot(loc: int, title: str, values: List[float]):
             plt.subplot(loc)
             plt.title(title)
-            plt.plot(values)
+            mps_tensor = torch.tensor(values).to(torch.float32).to("mps")
+            cpu_Tensor = mps_tensor.cpu()
+            numpy_array = cpu_Tensor.numpy()
+            plt.plot(numpy_array)
 
         subplot_params = [
             (311, f"frame {frame_idx}. score: {np.mean(scores[-10:])}", scores),
@@ -262,3 +322,18 @@ class DDPG:
             subplot(loc, title, values)
         plt.savefig("DDPG.png")
         plt.close()
+
+        x = [i for i in range(len(self.env.unwrapped.episode_reward))]
+        reward = self.env.unwrapped.episode_reward
+        rewardOfEnergy = self.env.unwrapped.episode_energy_reward
+        rewardOfTT = self.env.unwrapped.episode_tt_reward
+        rewardOfRemainingEnergy = self.env.unwrapped.episode_remainingEnergy_reward
+        tt = self.env.unwrapped.episode_tt
+        energy = self.env.unwrapped.episode_energy
+        classicFLEnergy = self.env.unwrapped.episode_classicFL_energy
+        classicFLTT = self.env.unwrapped.episode_classicFL_TT
+        utils.saveGraphs(savePath=f"{ROOT_DIR}/DDPG/Graphs", energy=energy, rewardOfEnergy=rewardOfEnergy,
+                         rewardOfTrainingTime=rewardOfTT,
+                         trainingTime=tt, reward=reward, x=x, allEnergy=self.env.unwrapped.episode_energy,
+                         allTrainingTime=self.env.unwrapped.episode_tt, classicFL_trainingTime=classicFLTT,
+                         classicFL_energy=classicFLEnergy, rewardOfRemainingEnergy=rewardOfRemainingEnergy)
