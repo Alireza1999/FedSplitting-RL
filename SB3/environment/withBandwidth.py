@@ -92,7 +92,7 @@ class CustomEnv(gym.Env):
 
         self.fraction = fraction
 
-        self.action_space = spaces.Box(low=0.0, high=1.0, shape=(2 * self.iotDeviceNum,), dtype=np.float32, seed=None)
+        self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(2 * self.iotDeviceNum,), dtype=np.float32, seed=None)
 
         # bandwidths : 0% fluctuation, 10% fluctuation, 20% fluctuation,..., 90% fluctuation.
         # observation_spec = [10] * (self.iotDeviceNum + self.edgeDeviceNum)
@@ -213,13 +213,13 @@ class CustomEnv(gym.Env):
 
         rewardOfTrainingTime = maxTrainingTime
         rewardOfTrainingTime -= self.currentClassicFLTrainingTime
-        rewardOfTrainingTime /= 100
+        rewardOfTrainingTime /= 380
         rewardOfTrainingTime *= -1
         rewardOfTrainingTime = min(max(rewardOfTrainingTime, -3), 3)
 
         rewardOfEnergy = averageEnergyConsumption
         rewardOfEnergy -= self.currentClassicFLEnergy
-        rewardOfEnergy /= 2.9
+        rewardOfEnergy /= 2
         rewardOfEnergy *= -1
         rewardOfEnergy = min(max(rewardOfEnergy, -3), 3)
 
@@ -243,9 +243,9 @@ class CustomEnv(gym.Env):
         normRewardOfRemainingEnergy = utils.normalizeReward(maxAmount=75, minAmount=-75, x=rewardOfRemainingEnergy,
                                                             maxNormalized=-3,
                                                             minNormalized=3)
-        self.rewardOfEnergy = 0.0 * rewardOfEnergy
+        self.rewardOfEnergy = 0.2 * rewardOfEnergy
         self.rewardOfTrainingTime = 0.0 * rewardOfTrainingTime
-        self.rewardOfRemainingEnergy = 1.0 * normRewardOfRemainingEnergy
+        self.rewardOfRemainingEnergy = 0.8 * normRewardOfRemainingEnergy
 
         # if remainingEnergyVariance != 0:
         #     reward = (1 / remainingEnergyVariance) * 100

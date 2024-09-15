@@ -278,10 +278,14 @@ def createAgent(env, lr, clip, batch_size, n_step, agentType='ppo'):
         return PPO("MlpPolicy", env, learning_rate=lr, verbose=1, clip_range=clip,
                    gamma=1.0, batch_size=batch_size, n_steps=n_step, device="mps", ent_coef=0.3)
     elif agentType == 'ddpg':
-        mean = np.array([0.3])
-        sigma = np.array([0.2])
-        return DDPG("MlpPolicy", env, learning_rate=lr, verbose=2, batch_size=batch_size, device="mps",
-                    buffer_size=10_000_000, gamma=1.0, seed=1234)
+        from stable_baselines3.common.noise import OrnsteinUhlenbeckActionNoise
+        mean = np.zeros((10,))
+        print("mean", mean)
+        sigma = [0.1] * 10
+        sigma = np.array(sigma)
+        return DDPG("MlpPolicy", env, learning_rate=linear_schedule(lr), verbose=2, batch_size=batch_size, device="mps",
+                    buffer_size=1_000_000, gamma=1.0, seed=777,
+                    action_noise=OrnsteinUhlenbeckActionNoise(mean=mean, sigma=sigma, theta=0.2))
     elif agentType == 'sac':
         return SAC("MlpPolicy", env, learning_rate=linear_schedule(lr), verbose=2, batch_size=batch_size, device="mps",
                    buffer_size=1_000_000, gamma=1.0, ent_coef='auto_0.1', use_sde=True)
@@ -399,8 +403,19 @@ def draw_3dGraph(x, y, z, xlabel, ylabel, zlabel):
     fig.show()
 
 
+def normalizeReward(maxAmount, minAmount, x, minNormalized, maxNormalized):
+    P = [maxAmount, minNormalized]
+    Q = [minAmount, maxNormalized]
+    lineGradient = (P[1] - Q[1]) / (P[0] - Q[0])
+    y = lineGradient * (x - Q[0]) + Q[1]
+    return y
+
+
 def actionToLayer(splitDecision: list) -> tuple:
     """ It returns the offloading points for the given action ( op1 , op2 ), split decision can be between -1 to 1"""
+
+    splitDecision[0] = normalizeReward(1, -1, splitDecision[0], 1, 0)
+    splitDecision[1] = normalizeReward(1, -1, splitDecision[1], 1, 0)
     if splitDecision[0] >= 0.96:
         return 6, 6
     else:
@@ -487,14 +502,6 @@ def tanhActivation(x: float) -> float:
     """ It returns the value (1-exp(-2x))/(1+exp(-2x)) and the value returned will be lies in between -1 to 1."""
 
     return np.tanh(x)
-
-
-def normalizeReward(maxAmount, minAmount, x, minNormalized, maxNormalized):
-    P = [maxAmount, minNormalized]
-    Q = [minAmount, maxNormalized]
-    lineGradient = (P[1] - Q[1]) / (P[0] - Q[0])
-    y = lineGradient * (x - Q[0]) + Q[1]
-    return y
 
 
 def normalizeReward_tan(x, turning_point):
