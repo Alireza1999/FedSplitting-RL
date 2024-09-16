@@ -442,50 +442,6 @@ def actionToLayer(splitDecision: list) -> tuple:
         return op1, op2
 
 
-print(actionToLayer([0.0, 0.0]))
-
-
-# def actionToLayer(splitDecision: list[float]) -> tuple[int, int]:
-#     """ It returns the offloading points for the given action ( op1 , op2 )"""
-#
-#     totalWorkLoad = sum(config.COMP_WORK_LOAD[1:])
-#
-#     op1: int
-#     op2: int = 0  # Offloading points op1, op2
-#
-#     op1_workload = splitDecision[0] * totalWorkLoad
-#     print(f"op1 WL: {op1_workload}")
-#     for i in range(0, config.LAYER_NUM):
-#         difference = abs(sum(config.COMP_WORK_LOAD[:i + 1]) - op1_workload)
-#         if i < 6:
-#             temp2 = abs(sum(config.COMP_WORK_LOAD[:i + 2]) - op1_workload)
-#         else:
-#             temp2 = abs(sum(config.COMP_WORK_LOAD) - op1_workload)
-#         print()
-#         print(f"i: {i}")
-#         print(f"def : {difference}")
-#         print(f"temp: {temp2}")
-#         if temp2 > difference:
-#             op1 = i
-#             break
-#
-#     if splitDecision[1] != -1:
-#         remindedWorkLoad = sum(config.COMP_WORK_LOAD[op1 + 1:]) * splitDecision[1]
-#
-#         for i in range(op1, len(config.COMP_WORK_LOAD)):
-#             difference = abs(sum(config.COMP_WORK_LOAD[op1 + 1:i + 1]) - remindedWorkLoad)
-#             temp2 = abs(sum(config.COMP_WORK_LOAD[op1 + 1:i + 2]) - remindedWorkLoad)
-#             if temp2 >= difference:
-#                 op2 = i
-#                 break
-#         if op2 == 0:
-#             op2 = op2 + 1
-#         if op1 == config.LAYER_NUM - 1:
-#             op2 = config.LAYER_NUM - 1
-#
-#     return op1, op2
-
-
 def sigmoidActivation(x: float) -> float:
     """ It returns 1/(1+exp(-x)). where the values lies between zero and one """
 

@@ -110,7 +110,7 @@ class CustomEnv(gym.Env):
         logger.info("-------------------------------------------")
         logger.info(f"Current Episode: {self.currentEpisode}")
         logger.info(f"Current Timestep: {self.currentTimestep}")
-        logger.info(f"Current Action: {action}\n")
+        logger.info(f"Current Action: {action}")
 
         for i in range(self.iotDeviceNum):
             self.iotDevices[i].setEffectiveBW(self.effectiveBandwidth[i])
@@ -139,7 +139,7 @@ class CustomEnv(gym.Env):
             if sum(config.COMP_WORK_LOAD[op2 + 1:]) != 0:
                 self.cloud.connectedDevice += 1
         self.currentOffloadingPoint = offloadingPoints
-        logger.info(f"Current Offloading: {self.currentOffloadingPoint}\n")
+        logger.info(f"Current Offloading: {self.currentOffloadingPoint}")
 
         remainingEnergyBefore = copy.deepcopy(self.currentRemainingEnergy)
 
@@ -227,7 +227,7 @@ class CustomEnv(gym.Env):
         consumedEnergy = [a - b for a, b in zip(remainingEnergyBefore, self.currentRemainingEnergy)]
         self.currentConsumedEnergy = consumedEnergy
         sortedConsumedEnergyIndex = sorted(range(len(consumedEnergy)), key=lambda k: consumedEnergy[k])
-        
+
         for i in range(len(consumedEnergy)):
             if ((sortedConsumedEnergyIndex[i] == clientsWithMinEnergy[i]) and
                     consumedEnergy[sortedConsumedEnergyIndex[i]] != 0):
@@ -253,7 +253,7 @@ class CustomEnv(gym.Env):
         #     reward = 0
         # else:
         #     reward = 10
-        
+
         allTurnAroundTimeOnEdgeNorm = [
             utils.normalizeReward(maxAmount=2700, minAmount=0, x=i, minNormalized=-1,
                                   maxNormalized=0) for i in allTurnAroundTimeOnEdge]
