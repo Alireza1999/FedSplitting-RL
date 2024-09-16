@@ -92,11 +92,12 @@ class CustomEnv(gym.Env):
 
         self.fraction = fraction
 
-        self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(2 * self.iotDeviceNum,), dtype=np.float32, seed=None)
+        self.action_space = spaces.Box(low=np.array([1, 0] * self.iotDeviceNum),
+                                       high=np.array([config.LAYER_NUM,config.LAYER_NUM-1]*self.iotDeviceNum),
+                                       shape=(2 * self.iotDeviceNum,),
+                                       dtype=np.int64,
+                                       seed=None)
 
-        # bandwidths : 0% fluctuation, 10% fluctuation, 20% fluctuation,..., 90% fluctuation.
-        # observation_spec = [10] * (self.iotDeviceNum + self.edgeDeviceNum)
-        # self.observation_space = spaces.MultiDiscrete(observation_spec)
         self.observation_space = spaces.Box(low=0.0, high=20,
                                             shape=(self.iotDeviceNum + self.edgeDeviceNum + self.iotDeviceNum,),
                                             dtype=np.float32, seed=None)
@@ -125,7 +126,7 @@ class CustomEnv(gym.Env):
         cloudRemainingFLOP = self.cloud.FLOPS
 
         for i in range(0, len(action), 2):
-            op1, op2 = utils.actionToLayer(action[i:i + 2])
+            op1, op2 = utils.actionToLayerDiscrete(action[i:i + 2])
             offloadingPoints.append(op1)
             offloadingPoints.append(op2)
 
@@ -227,7 +228,7 @@ class CustomEnv(gym.Env):
         consumedEnergy = [a - b for a, b in zip(remainingEnergyBefore, self.currentRemainingEnergy)]
         self.currentConsumedEnergy = consumedEnergy
         sortedConsumedEnergyIndex = sorted(range(len(consumedEnergy)), key=lambda k: consumedEnergy[k])
-        
+
         for i in range(len(consumedEnergy)):
             if ((sortedConsumedEnergyIndex[i] == clientsWithMinEnergy[i]) and
                     consumedEnergy[sortedConsumedEnergyIndex[i]] != 0):
@@ -253,7 +254,7 @@ class CustomEnv(gym.Env):
         #     reward = 0
         # else:
         #     reward = 10
-        
+
         allTurnAroundTimeOnEdgeNorm = [
             utils.normalizeReward(maxAmount=2700, minAmount=0, x=i, minNormalized=-1,
                                   maxNormalized=0) for i in allTurnAroundTimeOnEdge]

@@ -202,7 +202,7 @@ class Runner:
 
                 iotDevice_K_Action = []
                 for j in range(1, len(episodeAction[i])):
-                    op1, op2 = utils.actionToLayer(episodeAction[i][j][actionIndex:actionIndex + 2])
+                    op1, op2 = utils.actionToLayerDiscrete(episodeAction[i][j][actionIndex:actionIndex + 2])
                     iotDevice_K_Action.append(op1)
                 plt.subplot(3, 1, 3)
                 plt.plot(x, iotDevice_K_Action, color=color[k], linewidth='2', marker='o',
