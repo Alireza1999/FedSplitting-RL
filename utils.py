@@ -278,14 +278,8 @@ def createAgent(env, lr, clip, batch_size, n_step, agentType='ppo'):
         return PPO("MlpPolicy", env, learning_rate=lr, verbose=1, clip_range=clip,
                    gamma=1.0, batch_size=batch_size, n_steps=n_step, device="mps", ent_coef=0.3)
     elif agentType == 'ddpg':
-        from stable_baselines3.common.noise import OrnsteinUhlenbeckActionNoise
-        mean = np.zeros((10,))
-        print("mean", mean)
-        sigma = [0.1] * 10
-        sigma = np.array(sigma)
         return DDPG("MlpPolicy", env, learning_rate=linear_schedule(lr), verbose=2, batch_size=batch_size, device="mps",
-                    buffer_size=1_000_000, gamma=1.0, seed=777,
-                    action_noise=OrnsteinUhlenbeckActionNoise(mean=mean, sigma=sigma, theta=0.2))
+                    buffer_size=1_000_000, gamma=1.0, seed=777, )
     elif agentType == 'sac':
         return SAC("MlpPolicy", env, learning_rate=linear_schedule(lr), verbose=2, batch_size=batch_size, device="mps",
                    buffer_size=1_000_000, gamma=1.0, ent_coef='auto_0.1', use_sde=True)
